@@ -17,7 +17,7 @@ interface Particle {
   startY?: number
 }
 
-export default function IntroAnimation({ onComplete }: IntroProps) {
+export default function Intro({ onComplete }: IntroProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const typewriterTimeoutRef = useRef<NodeJS.Timeout | null>(null)
   const isTypingRef = useRef(false)
@@ -54,7 +54,7 @@ export default function IntroAnimation({ onComplete }: IntroProps) {
     if (isTypingRef.current) return
     isTypingRef.current = true
 
-    const text = 'Fragments   of   Structure'
+    const text = 'Fragments of Structure'
     const container = document.getElementById('logo')
     let index = 0
     const delay = 130
@@ -75,9 +75,10 @@ export default function IntroAnimation({ onComplete }: IntroProps) {
         span.style.display = 'inline-block'
         span.style.transition = 'transform 0.2s ease'
         
-        // F と S を太字に
+        // F と S を太字に（Interフォントの場合）
         if (char === 'F' || char === 'S') {
           span.style.fontWeight = '500'
+          span.style.letterSpacing = '0.08em'
         }
         
         // ホバー効果のためのイベントリスナー
@@ -332,13 +333,15 @@ export default function IntroAnimation({ onComplete }: IntroProps) {
       left: 0,
       right: 0,
       bottom: 0,
-      backgroundColor: 'var(--bg-primary)',
+      backgroundColor: '#f9f8f6',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
       overflow: 'hidden'
     }}>
       <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;500&display=swap');
+        
         @keyframes fadeIn {
           0% { opacity: 0; }
           100% { opacity: 1; }
@@ -349,19 +352,32 @@ export default function IntroAnimation({ onComplete }: IntroProps) {
         }
         
         #logo {
-          font-family: 'Satoshi', system-ui, -apple-system, sans-serif;
+          font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
           font-size: 2rem;
           font-weight: 300;
-          letter-spacing: 0.05em;
+          letter-spacing: 0.08em;
+          text-rendering: optimizeLegibility;
+          -webkit-font-smoothing: antialiased;
         }
         
         #jpTitle {
           font-family: 'Zen Kurenaido', 'Yu Mincho', serif;
+          font-weight: 400;
+          letter-spacing: 0.1em;
+        }
+        
+        #tagline {
+          font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+          font-weight: 300;
+          letter-spacing: 0.02em;
         }
         
         @media (max-width: 768px) {
           #logo {
             font-size: 1.5rem;
+          }
+          #jpTitle {
+            font-size: 0.875rem;
           }
         }
       `}</style>
@@ -410,7 +426,7 @@ export default function IntroAnimation({ onComplete }: IntroProps) {
           id="tagline"
           style={{
             fontSize: '0.875rem',
-            color: 'var(--text-muted)',
+            color: '#6a6a6a',
             marginTop: '1.25rem',
             fontStyle: 'italic',
             opacity: 0

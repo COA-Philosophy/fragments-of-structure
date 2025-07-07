@@ -1,207 +1,183 @@
-/* globals.css - Fragments of Structure */
-@import url('https://fonts.googleapis.com/css2?family=Zen+Kurenaido&family=Satoshi:wght@300;500&display=swap');
-@import "tailwindcss/base";
-@import "tailwindcss/components";
-@import "tailwindcss/utilities";
+/* src/app/globals.css */
+/* Fragments of Structure - Tailwind CSS v3対応グローバルスタイル */
 
-/* 世界観を保持するCSS変数 */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* カスタムフォント */
+@import url('https://fonts.googleapis.com/css2?family=Zen+Kurenaido&display=swap');
+
 :root {
-  /* 厳格な色彩設計 */
-  --bg-primary: #f9f8f6;      /* わずかに温かみのある生成り色 */
-  --text-primary: #1c1c1c;     /* 墨色に近い深いグレー */
-  --text-muted: #6a6a6a;       /* 説明・タグライン等 */
-  --line-color: #3a3a3a;       /* 横線演出 */
-  --accent-gold: #d4af37;      /* 希に使用する金属的な金 */
+  /* カラーパレット */
+  --bg-primary: #f9f8f6;
+  --text-primary: #1c1c1c;
+  --text-muted: #6a6a6a;
+  --line-color: #3a3a3a;
+  --accent-gold: #d4af37;
   --hover: rgba(0, 0, 0, 0.05);
-
-  /* 黄金比に基づく余白システム */
-  --space-unit: 8px;
-  --space-xs: calc(var(--space-unit) * 1);    /* 8px */
-  --space-sm: calc(var(--space-unit) * 2);    /* 16px */
-  --space-md: calc(var(--space-unit) * 3);    /* 24px */
-  --space-lg: calc(var(--space-unit) * 5);    /* 40px */
-  --space-xl: calc(var(--space-unit) * 8);    /* 64px */
-  --space-xxl: calc(var(--space-unit) * 13);  /* 104px */
 }
 
-/* 基本スタイル */
+/* ベーススタイル */
+* {
+  box-sizing: border-box;
+  padding: 0;
+  margin: 0;
+}
+
+html,
 body {
-  background-color: var(--bg-primary);
+  max-width: 100vw;
+  overflow-x: hidden;
+}
+
+body {
   color: var(--text-primary);
-  font-family: 'Satoshi', sans-serif;
-}
-
-/* フォント設定 */
-.font-satoshi {
-  font-family: 'Satoshi', sans-serif;
-}
-
-.font-zen {
-  font-family: 'Zen Kurenaido', 'Yu Mincho', serif;
-}
-
-/* Canvas背景スタイル */
-.canvas-bg {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  z-index: 0;
-}
-
-.content-layer {
-  position: relative;
-  z-index: 1;
-}
-
-/* 詩的アニメーション */
-.hover-lift {
-  transition: transform 0.2s ease;
-}
-
-.hover-lift:hover {
-  transform: translateY(-1px) rotateZ(0.5deg);
-}
-
-/* Fragment番号スタイル */
-.fragment-number {
-  font-family: 'Satoshi', sans-serif;
-  font-weight: 300;
-  font-size: 0.9rem;
-  color: var(--text-muted);
-  letter-spacing: 0.05em;
-}
-
-/* 日本語タイトル */
-.japanese {
-  font-family: 'Zen Kurenaido', 'Yu Mincho', serif;
-  writing-mode: horizontal-tb; /* 縦組みは後で実装 */
-}
-
-/* ロゴテキスト */
-.logo-text {
-  font-family: 'Satoshi', sans-serif;
-  font-weight: 300;
-  letter-spacing: 0.05em;
-}
-
-.logo-text span.font-medium {
-  font-weight: 500; /* F と S のみ太字 */
-}
-
-/* カードスタイル（ギャラリー用） */
-.fragment-card {
   background: var(--bg-primary);
-  border-radius: 8px;
-  overflow: hidden;
-  transition: all 0.8s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-.fragment-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.1);
-}
-
-/* サムネイル表示 */
-.fragment-thumbnail {
-  width: 100%;
-  height: 200px;
-  object-fit: cover;
-  border-radius: 4px;
-  background: var(--bg-primary);
-  transition: all 200ms ease;
-}
-
-.fragment-thumbnail:hover {
-  transform: scale(1.02);
-  opacity: 0.9;
-}
-
-/* 詩的プロンプトスタイル */
-.poetry-prompt {
-  background: rgba(0, 0, 0, 0.8);
-  backdrop-filter: blur(8px);
-  color: #ffffff;
-  font-family: 'Yu Mincho', serif;
-  font-size: 1rem;
-  line-height: 1.6;
-  text-align: center;
-  padding: var(--space-xxl);
-}
-
-.poetry-prompt .english {
-  font-style: italic;
-  opacity: 0.8;
-  font-size: 0.9rem;
-  margin-top: var(--space-sm);
-}
-
-/* アクションボタン */
-.trace-button {
-  background: var(--accent-gold);
-  color: var(--text-primary);
-  border: none;
-  padding: var(--space-sm) var(--space-lg);
-  border-radius: 4px;
-  font-size: 0.9rem;
-  transition: all 200ms ease;
-}
-
-.skip-button {
-  background: transparent;
-  color: white;
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  padding: var(--space-sm) var(--space-lg);
-  border-radius: 4px;
-  font-size: 0.9rem;
+/* 和文フォント */
+.zen-kurenaido {
+  font-family: 'Zen Kurenaido', serif;
 }
 
 /* カスタムアニメーション */
-@keyframes fadeIn {
-  0% { opacity: 0; }
-  100% { opacity: 1; }
-}
-
-@keyframes sway {
-  0%, 100% { transform: translateX(0); }
-  50% { transform: translateX(1px); }
-}
-
-@keyframes slideUp {
-  0% { 
+@keyframes fadeInUp {
+  from {
     opacity: 0;
     transform: translateY(20px);
   }
-  100% { 
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slideInFromBottom {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
     opacity: 1;
     transform: translateY(0);
   }
 }
 
 @keyframes scaleIn {
-  0% { 
+  from {
     opacity: 0;
-    transform: scale(0.9);
+    transform: scale(0.95);
   }
-  100% { 
+  to {
     opacity: 1;
     transform: scale(1);
   }
 }
 
-/* レスポンシブ対応 */
-@media (max-width: 768px) {
-  .logo-text {
-    font-size: 1.4rem;
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
   }
-  
-  .japanese {
-    font-size: 0.9rem;
+  50% {
+    opacity: 0.5;
   }
-  
-  .fragment-card {
-    margin: 0 1rem;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Tailwindカスタムアニメーションクラス */
+.animate-fadeInUp {
+  animation: fadeInUp 0.6s ease-out forwards;
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.4s ease-out forwards;
+}
+
+.animate-slideInFromBottom {
+  animation: slideInFromBottom 0.5s ease-out forwards;
+}
+
+.animate-scaleIn {
+  animation: scaleIn 0.3s ease-out forwards;
+}
+
+.animate-pulse-slow {
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.animate-spin-slow {
+  animation: spin 3s linear infinite;
+}
+
+/* ユーティリティクラス */
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.line-clamp-3 {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* スクロールバーのカスタマイズ */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-primary);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--text-muted);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-primary);
+}
+
+/* フォーカス可視性の改善 */
+button:focus,
+input:focus,
+textarea:focus {
+  outline: 2px solid var(--accent-gold);
+  outline-offset: 2px;
+}
+
+/* 動きを減らすモード対応 */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }
