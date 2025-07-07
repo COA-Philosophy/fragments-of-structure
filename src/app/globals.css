@@ -1,26 +1,207 @@
-@import "tailwindcss";
+/* globals.css - Fragments of Structure */
+@import url('https://fonts.googleapis.com/css2?family=Zen+Kurenaido&family=Satoshi:wght@300;500&display=swap');
+@import "tailwindcss/base";
+@import "tailwindcss/components";
+@import "tailwindcss/utilities";
 
+/* 世界観を保持するCSS変数 */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* 厳格な色彩設計 */
+  --bg-primary: #f9f8f6;      /* わずかに温かみのある生成り色 */
+  --text-primary: #1c1c1c;     /* 墨色に近い深いグレー */
+  --text-muted: #6a6a6a;       /* 説明・タグライン等 */
+  --line-color: #3a3a3a;       /* 横線演出 */
+  --accent-gold: #d4af37;      /* 希に使用する金属的な金 */
+  --hover: rgba(0, 0, 0, 0.05);
+
+  /* 黄金比に基づく余白システム */
+  --space-unit: 8px;
+  --space-xs: calc(var(--space-unit) * 1);    /* 8px */
+  --space-sm: calc(var(--space-unit) * 2);    /* 16px */
+  --space-md: calc(var(--space-unit) * 3);    /* 24px */
+  --space-lg: calc(var(--space-unit) * 5);    /* 40px */
+  --space-xl: calc(var(--space-unit) * 8);    /* 64px */
+  --space-xxl: calc(var(--space-unit) * 13);  /* 104px */
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+/* 基本スタイル */
+body {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: 'Satoshi', sans-serif;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+/* フォント設定 */
+.font-satoshi {
+  font-family: 'Satoshi', sans-serif;
+}
+
+.font-zen {
+  font-family: 'Zen Kurenaido', 'Yu Mincho', serif;
+}
+
+/* Canvas背景スタイル */
+.canvas-bg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+}
+
+.content-layer {
+  position: relative;
+  z-index: 1;
+}
+
+/* 詩的アニメーション */
+.hover-lift {
+  transition: transform 0.2s ease;
+}
+
+.hover-lift:hover {
+  transform: translateY(-1px) rotateZ(0.5deg);
+}
+
+/* Fragment番号スタイル */
+.fragment-number {
+  font-family: 'Satoshi', sans-serif;
+  font-weight: 300;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+  letter-spacing: 0.05em;
+}
+
+/* 日本語タイトル */
+.japanese {
+  font-family: 'Zen Kurenaido', 'Yu Mincho', serif;
+  writing-mode: horizontal-tb; /* 縦組みは後で実装 */
+}
+
+/* ロゴテキスト */
+.logo-text {
+  font-family: 'Satoshi', sans-serif;
+  font-weight: 300;
+  letter-spacing: 0.05em;
+}
+
+.logo-text span.font-medium {
+  font-weight: 500; /* F と S のみ太字 */
+}
+
+/* カードスタイル（ギャラリー用） */
+.fragment-card {
+  background: var(--bg-primary);
+  border-radius: 8px;
+  overflow: hidden;
+  transition: all 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05);
+}
+
+.fragment-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.1);
+}
+
+/* サムネイル表示 */
+.fragment-thumbnail {
+  width: 100%;
+  height: 200px;
+  object-fit: cover;
+  border-radius: 4px;
+  background: var(--bg-primary);
+  transition: all 200ms ease;
+}
+
+.fragment-thumbnail:hover {
+  transform: scale(1.02);
+  opacity: 0.9;
+}
+
+/* 詩的プロンプトスタイル */
+.poetry-prompt {
+  background: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(8px);
+  color: #ffffff;
+  font-family: 'Yu Mincho', serif;
+  font-size: 1rem;
+  line-height: 1.6;
+  text-align: center;
+  padding: var(--space-xxl);
+}
+
+.poetry-prompt .english {
+  font-style: italic;
+  opacity: 0.8;
+  font-size: 0.9rem;
+  margin-top: var(--space-sm);
+}
+
+/* アクションボタン */
+.trace-button {
+  background: var(--accent-gold);
+  color: var(--text-primary);
+  border: none;
+  padding: var(--space-sm) var(--space-lg);
+  border-radius: 4px;
+  font-size: 0.9rem;
+  transition: all 200ms ease;
+}
+
+.skip-button {
+  background: transparent;
+  color: white;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  padding: var(--space-sm) var(--space-lg);
+  border-radius: 4px;
+  font-size: 0.9rem;
+}
+
+/* カスタムアニメーション */
+@keyframes fadeIn {
+  0% { opacity: 0; }
+  100% { opacity: 1; }
+}
+
+@keyframes sway {
+  0%, 100% { transform: translateX(0); }
+  50% { transform: translateX(1px); }
+}
+
+@keyframes slideUp {
+  0% { 
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  100% { 
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+@keyframes scaleIn {
+  0% { 
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  100% { 
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* レスポンシブ対応 */
+@media (max-width: 768px) {
+  .logo-text {
+    font-size: 1.4rem;
+  }
+  
+  .japanese {
+    font-size: 0.9rem;
+  }
+  
+  .fragment-card {
+    margin: 0 1rem;
+  }
 }
