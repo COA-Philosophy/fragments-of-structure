@@ -5,12 +5,12 @@ import { executeCanvasCode, analyzeCodeType } from '@/utils/codeExecutor'
 
 interface CodePreviewProps {
   code: string
-  fragmentId: string
+  fragmentId?: string  // オプショナルに変更（?を追加）
   className?: string
   isFullscreen?: boolean  // フルスクリーンかどうか
 }
 
-export default function CodePreview({ code, fragmentId, className = '', isFullscreen = false }: CodePreviewProps) {
+export default function CodePreview({ code, fragmentId = 'preview', className = '', isFullscreen = false }: CodePreviewProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const [error, setError] = useState<string | null>(null)

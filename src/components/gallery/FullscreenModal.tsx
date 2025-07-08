@@ -71,11 +71,11 @@ export default function FullscreenModal({ fragment, isOpen, onClose }: Fullscree
       {/* 閉じるボタン */}
       <button
         onClick={onClose}
-        className="absolute top-6 right-6 text-white/70 hover:text-white transition-colors z-20 drop-shadow-lg"
+        className="absolute top-6 right-6 text-white hover:text-white bg-black/50 hover:bg-black/70 p-3 rounded-full transition-all z-20 drop-shadow-lg"
         aria-label="閉じる"
       >
-        <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 18L18 6M6 6l12 12" />
+        <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
         </svg>
       </button>
 
