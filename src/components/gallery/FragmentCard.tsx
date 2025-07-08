@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import CodePreview from '../canvas/CodePreview'
+import FullscreenModal from './FullscreenModal'
 import { Fragment } from '@/types/fragment'
 
 interface FragmentCardProps {
@@ -25,6 +26,9 @@ export default function FragmentCard({ fragment }: FragmentCardProps) {
   const [whispers, setWhispers] = useState<Array<{id: string, content: string, created_at: string}>>([])
   const [submittingWhisper, setSubmittingWhisper] = useState(false)
   const [whisperError, setWhisperError] = useState('')
+  
+  // フルスクリーン表示用の状態
+  const [showFullscreen, setShowFullscreen] = useState(false)
 
   // タイプに応じた色を設定
   const typeColor = {
@@ -249,11 +253,24 @@ export default function FragmentCard({ fragment }: FragmentCardProps) {
       </div>
 
       {/* Preview Section */}
-      <div className="relative h-64 bg-gray-50 rounded-lg overflow-hidden">
+      <div 
+        className="relative h-64 bg-gray-50 rounded-lg overflow-hidden cursor-pointer hover:opacity-90 transition-opacity"
+        onClick={() => setShowFullscreen(true)}
+      >
         <CodePreview 
           code={fragment.code} 
           fragmentId={fragment.display_number.toString()}
+          isFullscreen={false}
         />
+        
+        {/* フルスクリーンアイコン（ホバー時に表示） */}
+        <div className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity bg-black/20">
+          <div className="bg-white/90 rounded-full p-3">
+            <svg className="w-6 h-6 text-gray-800" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+            </svg>
+          </div>
+        </div>
       </div>
 
       {/* Content Section */}
@@ -436,6 +453,13 @@ export default function FragmentCard({ fragment }: FragmentCardProps) {
           </div>
         </div>
       )}
+
+      {/* フルスクリーンモーダル */}
+      <FullscreenModal
+        fragment={fragment}
+        isOpen={showFullscreen}
+        onClose={() => setShowFullscreen(false)}
+      />
     </div>
   )
 }
