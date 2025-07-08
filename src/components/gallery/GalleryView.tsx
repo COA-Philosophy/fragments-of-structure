@@ -52,7 +52,7 @@ export default function GalleryView() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-pulse text-gray-400">
+        <div className="animate-pulse text-gray-400 animate-fade-in">
           作品を読み込んでいます...
         </div>
       </div>
@@ -72,21 +72,21 @@ export default function GalleryView() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* ヘッダー */}
         <div className="text-center mb-12">
-          <h1 className="text-3xl font-light text-gray-800 mb-4">
+          <h1 className="text-3xl font-light text-gray-800 mb-4 animate-fade-in-up">
             Fragments of Structure
           </h1>
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-gray-600 animate-fade-in-up animation-delay-120">
             構造のかけらたち
           </p>
         </div>
 
         {/* フィルターボタン */}
-        <div className="flex justify-center mb-8 space-x-4">
+        <div className="flex justify-center mb-8 space-x-4 animate-fade-in-up animation-delay-240">
           <button
             onClick={() => setFilterType('all')}
-            className={`px-4 py-2 text-sm rounded-full transition-colors ${
+            className={`px-4 py-2 text-sm rounded-full transition-all duration-200 transform hover:scale-105 ${
               filterType === 'all'
-                ? 'bg-gray-800 text-white'
+                ? 'bg-gray-800 text-white shadow-md'
                 : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
             }`}
           >
@@ -97,9 +97,9 @@ export default function GalleryView() {
             <button
               key={type}
               onClick={() => setFilterType(type)}
-              className={`px-4 py-2 text-sm rounded-full transition-colors ${
+              className={`px-4 py-2 text-sm rounded-full transition-all duration-200 transform hover:scale-105 ${
                 filterType === type
-                  ? 'bg-gray-800 text-white'
+                  ? 'bg-gray-800 text-white shadow-md'
                   : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
               }`}
             >
@@ -110,8 +110,14 @@ export default function GalleryView() {
 
         {/* 作品グリッド */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {filteredFragments.map((fragment) => (
-            <FragmentCard key={fragment.id} fragment={fragment} />
+          {filteredFragments.map((fragment, index) => (
+            <div 
+              key={fragment.id}
+              className={`animate-fade-in-up`}
+              style={{ animationDelay: `${360 + index * 120}ms` }}
+            >
+              <FragmentCard fragment={fragment} />
+            </div>
           ))}
         </div>
 
