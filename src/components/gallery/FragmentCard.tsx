@@ -154,7 +154,7 @@ export default function FragmentCard({ fragment }: FragmentCardProps) {
     <div className="bg-white rounded-lg shadow-sm hover:shadow-lg transition-all duration-300 hover:-translate-y-1 overflow-hidden relative group">
       {/* Fragment number and type display */}
       <div className="absolute top-2 left-2 z-10 flex items-center space-x-2">
-        <span className="text-xs text-gray-500 bg-white/80 px-2 py-1 rounded">
+        <span className="text-xs text-gray-500 bg-white/80 px-2 py-1 rounded font-satoshi-light tracking-wider">
           Fragment {String(fragment.display_number).padStart(3, '0')}
         </span>
         <span className={`text-xs px-2 py-1 rounded ${typeColor}`}>
@@ -258,18 +258,18 @@ export default function FragmentCard({ fragment }: FragmentCardProps) {
 
       {/* Content Section */}
       <div className="p-4">
-        <h3 className="text-lg font-medium text-gray-800 mb-2">
+        <h3 className="text-lg font-medium text-gray-800 mb-2 font-noto-serif">
           {fragment.title}
         </h3>
         
         {fragment.description && (
-          <p className="text-sm text-gray-600 mb-3">
+          <p className="text-sm text-gray-600 mb-3 font-noto-serif">
             {fragment.description}
           </p>
         )}
 
         {fragment.prompt && (
-          <p className="text-xs text-gray-500 italic">
+          <p className="text-xs text-gray-500 italic font-yu-mincho">
             Prompt: {fragment.prompt.substring(0, 50)}...
           </p>
         )}
@@ -279,12 +279,12 @@ export default function FragmentCard({ fragment }: FragmentCardProps) {
           <div className="mt-3 pt-3 border-t border-gray-100">
             <div className="space-y-1">
               {whispers.slice(0, 2).map((whisper) => (
-                <p key={whisper.id} className="text-xs text-gray-600 italic">
+                <p key={whisper.id} className="text-xs text-gray-600 italic font-yu-mincho">
                   "{whisper.content}"
                 </p>
               ))}
               {whispers.length > 2 && (
-                <p className="text-xs text-gray-400">
+                <p className="text-xs text-gray-400 font-lora">
                   +{whispers.length - 2} more...
                 </p>
               )}
@@ -313,35 +313,43 @@ export default function FragmentCard({ fragment }: FragmentCardProps) {
       {/* Delete confirmation modal */}
       {showDeleteModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 max-w-sm w-full mx-4">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">
-              Delete Fragment {String(fragment.display_number).padStart(3, '0')}
-            </h3>
-            <p className="text-sm text-gray-600 mb-4">
-              This action cannot be undone. Please enter your password to delete.
-            </p>
+          <div className="bg-[#f9f8f6] rounded-sm shadow-2xl max-w-sm w-full mx-4 border border-[#3a3a3a]/10">
+            <div className="p-6">
+              <h3 className="text-lg font-light text-[#1c1c1c] mb-2 font-satoshi-light">
+                Delete Fragment {String(fragment.display_number).padStart(3, '0')}
+              </h3>
+              <p className="text-sm text-[#6a6a6a] mb-6 font-lora">
+                This action cannot be undone. Please enter your password to delete.
+              </p>
+              
+              <input
+                type="password"
+                value={deletePassword}
+                onChange={(e) => setDeletePassword(e.target.value)}
+                placeholder="Password"
+                className="w-full px-3 py-2 bg-white border border-[#3a3a3a]/20 rounded-sm 
+                          focus:outline-none focus:border-[#3a3a3a]/40 
+                          text-[#1c1c1c] placeholder-[#6a6a6a] 
+                          transition-colors duration-200"
+                disabled={deleting}
+                autoFocus
+              />
+              
+              {deleteError && (
+                <p className="text-red-600 text-sm mt-2">{deleteError}</p>
+              )}
+            </div>
             
-            <input
-              type="password"
-              value={deletePassword}
-              onChange={(e) => setDeletePassword(e.target.value)}
-              placeholder="Password"
-              className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-500 mb-2"
-              disabled={deleting}
-            />
-            
-            {deleteError && (
-              <p className="text-red-500 text-sm mb-4">{deleteError}</p>
-            )}
-            
-            <div className="flex justify-end space-x-3 mt-4">
+            <div className="flex border-t border-[#3a3a3a]/10">
               <button
                 onClick={() => {
                   setShowDeleteModal(false)
                   setDeletePassword('')
                   setDeleteError('')
                 }}
-                className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 transition-colors"
+                className="flex-1 px-4 py-3 text-sm text-[#6a6a6a] hover:text-[#1c1c1c] 
+                          hover:bg-[#3a3a3a]/5 transition-all duration-200
+                          border-r border-[#3a3a3a]/10"
                 disabled={deleting}
               >
                 Cancel
@@ -349,7 +357,9 @@ export default function FragmentCard({ fragment }: FragmentCardProps) {
               <button
                 onClick={handleDelete}
                 disabled={!deletePassword || deleting}
-                className="px-4 py-2 bg-red-600 text-white text-sm rounded-md hover:bg-red-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
+                className="flex-1 px-4 py-3 text-sm text-[#f9f8f6] bg-[#8b4545]
+                          hover:bg-[#7a3838] disabled:bg-[#6a6a6a] 
+                          disabled:cursor-not-allowed transition-all duration-200"
               >
                 {deleting ? 'Deleting...' : 'Delete'}
               </button>

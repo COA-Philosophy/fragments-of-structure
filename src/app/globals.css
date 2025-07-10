@@ -5,8 +5,34 @@
 @tailwind components;
 @tailwind utilities;
 
-/* カスタムフォント */
-@import url('https://fonts.googleapis.com/css2?family=Zen+Kurenaido&display=swap');
+/* カスタムフォント読み込み */
+/* Satoshiフォント（セルフホスト） */
+@font-face {
+  font-family: 'Satoshi';
+  src: url('/fonts/Satoshi-Light.woff2') format('woff2');
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Satoshi';
+  src: url('/fonts/Satoshi-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Satoshi';
+  src: url('/fonts/Satoshi-Medium.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* 和文フォント（Google Fonts） */
+@import url('https://fonts.googleapis.com/css2?family=Zen+Kurenaido&family=Noto+Serif+JP:wght@300;400&family=Lora:wght@400&display=swap');
 
 :root {
   /* カラーパレット */
@@ -34,16 +60,49 @@ body {
 body {
   color: var(--text-primary);
   background: var(--bg-primary);
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+  /* デフォルトフォント：Satoshiをメインに使用 */
+  font-family: 'Satoshi', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
     'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  font-weight: 400;
 }
 
-/* 和文フォント */
-.zen-kurenaido {
+/* フォントクラス定義 */
+/* 英文ロゴ・Fragment番号用（Satoshi使用） */
+.font-satoshi-light {
+  font-family: 'Satoshi', sans-serif;
+  font-weight: 300;
+}
+
+.font-satoshi-medium {
+  font-family: 'Satoshi', sans-serif;
+  font-weight: 500;
+}
+
+/* 和文タイトル用 */
+.font-zen-kurenaido {
   font-family: 'Zen Kurenaido', serif;
+}
+
+/* 詩的プロンプト用（游明朝代替） */
+.font-yu-mincho {
+  font-family: 'Noto Serif JP', serif;
+  font-weight: 300;
+  font-style: italic;
+}
+
+/* 英語本文用 */
+.font-lora {
+  font-family: 'Lora', serif;
+  font-weight: 400;
+}
+
+/* 日本語本文用 */
+.font-noto-serif {
+  font-family: 'Noto Serif JP', serif;
+  font-weight: 400;
 }
 
 /* カスタムアニメーション */
@@ -182,58 +241,6 @@ textarea:focus {
   }
 }
 
-/* アニメーションクラス */
-@keyframes fadeInUp {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
-}
-
-.animate-fade-in-up {
-  animation: fadeInUp 0.6s ease-out forwards;
-  opacity: 0;
-}
-
-.animate-fade-in {
-  animation: fadeIn 0.4s ease-out forwards;
-  opacity: 0;
-}
-
-/* 遅延クラス */
-.animation-delay-120 {
-  animation-delay: 120ms;
-}
-
-.animation-delay-240 {
-  animation-delay: 240ms;
-}
-
-.animation-delay-360 {
-  animation-delay: 360ms;
-}
-
-.animation-delay-480 {
-  animation-delay: 480ms;
-}
-
-.animation-delay-600 {
-  animation-delay: 600ms;
-}
-
 /* 共鳴エフェクト */
 @keyframes ping {
   75%, 100% {
@@ -251,6 +258,7 @@ textarea:focus {
   color: #9ca3af;
   cursor: default;
 }
+
 /* Toast animations */
 @keyframes fadeIn {
   from {

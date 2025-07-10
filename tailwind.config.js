@@ -15,7 +15,22 @@ module.exports = {
         'accent-gold': '#d4af37',
       },
       fontFamily: {
+        // 英文ロゴ・Fragment番号用（Satoshi）
+        'satoshi-light': ['Satoshi', 'sans-serif'],
+        'satoshi-medium': ['Satoshi', 'sans-serif'],
+        // 和文タイトル用
         'zen-kurenaido': ['Zen Kurenaido', 'serif'],
+        // 詩的プロンプト用（游明朝代替）
+        'yu-mincho': ['Noto Serif JP', 'serif'],
+        // 英語本文用
+        'lora': ['Lora', 'serif'],
+        // 日本語本文用
+        'noto-serif': ['Noto Serif JP', 'serif'],
+      },
+      fontWeight: {
+        'light': 300,
+        'normal': 400,
+        'medium': 500,
       },
       animation: {
         'fadeInUp': 'fadeInUp 0.6s ease-out forwards',
