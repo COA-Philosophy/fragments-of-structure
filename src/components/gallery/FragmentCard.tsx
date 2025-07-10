@@ -5,6 +5,7 @@ import CodePreview from '../canvas/CodePreview'
 import FullscreenModal from './FullscreenModal'
 import WhisperButton from './WhisperButton'
 import ResonanceButton from './ResonanceButton'
+import Toast from './Toast'
 import { Fragment } from '@/types/fragment'
 
 interface FragmentCardProps {
@@ -18,14 +19,33 @@ export default function FragmentCard({ fragment }: FragmentCardProps) {
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState('')
   const menuRef = useRef<HTMLDivElement>(null)
+  const menuTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   
-  // コメント関連の状態
+  // Toast state
+  const [toastMessage, setToastMessage] = useState('')
+  const [showToast, setShowToast] = useState(false)
+  
+  // Clear menu timeout
+  const clearMenuTimeout = () => {
+    if (menuTimeoutRef.current) {
+      clearTimeout(menuTimeoutRef.current)
+      menuTimeoutRef.current = null
+    }
+  }
+
+  // Show toast notification
+  const showToastMessage = (message: string) => {
+    setToastMessage(message)
+    setShowToast(true)
+  }
+
+  // Comments related state
   const [whispers, setWhispers] = useState<Array<{id: string, content: string, created_at: string}>>([])
   
-  // フルスクリーン表示用の状態
+  // Fullscreen display state
   const [showFullscreen, setShowFullscreen] = useState(false)
 
-  // タイプに応じた色を設定
+  // Type-based color settings
   const typeColor = {
     canvas: 'bg-blue-100 text-blue-800',
     three: 'bg-purple-100 text-purple-800',
@@ -34,7 +54,7 @@ export default function FragmentCard({ fragment }: FragmentCardProps) {
     css: 'bg-yellow-100 text-yellow-800'
   }[fragment.type] || 'bg-gray-100 text-gray-800'
 
-  // コメントを取得
+  // Fetch comments
   const fetchWhispers = async () => {
     try {
       const response = await fetch(`/api/fragments/${fragment.id}/whisper`)
@@ -43,11 +63,11 @@ export default function FragmentCard({ fragment }: FragmentCardProps) {
         setWhispers(data.whispers || [])
       }
     } catch (error) {
-      console.error('コメント取得エラー:', error)
+      console.error('Failed to fetch whispers:', error)
     }
   }
 
-  // メニューの外側クリックで閉じる
+  // Close menu when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
@@ -61,15 +81,16 @@ export default function FragmentCard({ fragment }: FragmentCardProps) {
 
     return () => {
       document.removeEventListener('mousedown', handleClickOutside)
+      clearMenuTimeout()
     }
   }, [menuOpen])
 
-  // 初期表示時にコメントを取得
+  // Fetch comments on initial display
   useEffect(() => {
     fetchWhispers()
   }, [])
 
-  // 削除処理
+  // Delete process
   const handleDelete = async () => {
     if (!deletePassword || deleting) return
 
@@ -88,42 +109,50 @@ export default function FragmentCard({ fragment }: FragmentCardProps) {
       const data = await response.json()
 
       if (response.ok) {
-        // 削除成功 - ページをリロード
+        // Delete success - reload page
         window.location.reload()
       } else {
-        setDeleteError(data.error || '削除に失敗しました')
+        setDeleteError(data.error || 'Failed to delete')
       }
     } catch (error) {
-      setDeleteError('削除処理中にエラーが発生しました')
+      setDeleteError('An error occurred during deletion')
     } finally {
       setDeleting(false)
     }
   }
 
-  // コードコピー
-  const handleCopyCode = () => {
-    navigator.clipboard.writeText(fragment.code)
-    setMenuOpen(false)
-    // TODO: コピー成功の通知を表示
-  }
-
-  // プロンプトコピー
-  const handleCopyPrompt = () => {
-    if (fragment.prompt) {
-      navigator.clipboard.writeText(fragment.prompt)
+  // Copy code
+  const handleCopyCode = async () => {
+    try {
+      await navigator.clipboard.writeText(fragment.code)
       setMenuOpen(false)
-      // TODO: コピー成功の通知を表示
+      showToastMessage('Code copied')
+    } catch (error) {
+      showToastMessage('Failed to copy')
     }
   }
 
-  // Whisperコールバック
+  // Copy prompt
+  const handleCopyPrompt = async () => {
+    if (fragment.prompt) {
+      try {
+        await navigator.clipboard.writeText(fragment.prompt)
+        setMenuOpen(false)
+        showToastMessage('Prompt copied')
+      } catch (error) {
+        showToastMessage('Failed to copy')
+      }
+    }
+  }
+
+  // Whisper callback
   const handleWhisperSubmit = (content: string) => {
     fetchWhispers()
   }
 
   return (
     <div className="bg-white rounded-lg shadow-sm hover:shadow-lg transition-all duration-300 hover:-translate-y-1 overflow-hidden relative group">
-      {/* Fragment番号とタイプ表示 */}
+      {/* Fragment number and type display */}
       <div className="absolute top-2 left-2 z-10 flex items-center space-x-2">
         <span className="text-xs text-gray-500 bg-white/80 px-2 py-1 rounded">
           Fragment {String(fragment.display_number).padStart(3, '0')}
@@ -133,10 +162,25 @@ export default function FragmentCard({ fragment }: FragmentCardProps) {
         </span>
       </div>
 
-      {/* 3点メニュー */}
-      <div className="absolute top-2 right-2 z-10" ref={menuRef}>
+      {/* 3-dot menu */}
+      <div 
+        className="absolute top-2 right-2 z-10" 
+        ref={menuRef}
+        onMouseEnter={() => {
+          clearMenuTimeout()
+        }}
+        onMouseLeave={() => {
+          // Close menu after 1 second delay
+          menuTimeoutRef.current = setTimeout(() => {
+            setMenuOpen(false)
+          }, 1000) // 1000ms = 1 second (adjustable)
+        }}
+      >
         <button
-          onClick={() => setMenuOpen(!menuOpen)}
+          onClick={() => {
+            clearMenuTimeout()
+            setMenuOpen(!menuOpen)
+          }}
           className="p-2 rounded-full bg-white/80 hover:bg-white transition-colors opacity-0 group-hover:opacity-100"
         >
           <svg
@@ -154,30 +198,37 @@ export default function FragmentCard({ fragment }: FragmentCardProps) {
           </svg>
         </button>
 
-        {/* ドロップダウンメニュー */}
+        {/* Dropdown menu */}
         {menuOpen && (
           <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1">
             <button 
               onClick={() => {
+                clearMenuTimeout()
                 setShowDeleteModal(true)
                 setMenuOpen(false)
               }}
               className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
             >
-              削除
+              Delete
             </button>
             <button 
-              onClick={handleCopyCode}
+              onClick={async () => {
+                clearMenuTimeout()
+                await handleCopyCode()
+              }}
               className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
             >
-              コードをコピー
+              Copy code
             </button>
             {fragment.prompt && (
               <button 
-                onClick={handleCopyPrompt}
+                onClick={async () => {
+                  clearMenuTimeout()
+                  await handleCopyPrompt()
+                }}
                 className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
               >
-                プロンプトをコピー
+                Copy prompt
               </button>
             )}
           </div>
@@ -195,7 +246,7 @@ export default function FragmentCard({ fragment }: FragmentCardProps) {
           isFullscreen={false}
         />
         
-        {/* フルスクリーンアイコン（ホバー時に表示） */}
+        {/* Fullscreen icon (shown on hover) */}
         <div className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity bg-black/20">
           <div className="bg-white/90 rounded-full p-3">
             <svg className="w-6 h-6 text-gray-800" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -219,29 +270,29 @@ export default function FragmentCard({ fragment }: FragmentCardProps) {
 
         {fragment.prompt && (
           <p className="text-xs text-gray-500 italic">
-            プロンプト: {fragment.prompt.substring(0, 50)}...
+            Prompt: {fragment.prompt.substring(0, 50)}...
           </p>
         )}
 
-        {/* 最新のコメント表示 */}
+        {/* Latest comments display */}
         {whispers.length > 0 && (
           <div className="mt-3 pt-3 border-t border-gray-100">
             <div className="space-y-1">
               {whispers.slice(0, 2).map((whisper) => (
                 <p key={whisper.id} className="text-xs text-gray-600 italic">
-                  「{whisper.content}」
+                  "{whisper.content}"
                 </p>
               ))}
               {whispers.length > 2 && (
                 <p className="text-xs text-gray-400">
-                  他{whispers.length - 2}件...
+                  +{whispers.length - 2} more...
                 </p>
               )}
             </div>
           </div>
         )}
 
-        {/* Footer - 新しいボタンコンポーネントを使用 */}
+        {/* Footer - Using new button components */}
         <div className="mt-4 pt-3 border-t border-gray-100 flex justify-between items-center">
           {/* ResonanceButton */}
           <ResonanceButton 
@@ -259,22 +310,22 @@ export default function FragmentCard({ fragment }: FragmentCardProps) {
         </div>
       </div>
 
-      {/* 削除確認モーダル */}
+      {/* Delete confirmation modal */}
       {showDeleteModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 max-w-sm w-full mx-4">
             <h3 className="text-lg font-medium text-gray-900 mb-4">
-              Fragment {String(fragment.display_number).padStart(3, '0')} を削除
+              Delete Fragment {String(fragment.display_number).padStart(3, '0')}
             </h3>
             <p className="text-sm text-gray-600 mb-4">
-              この操作は取り消せません。削除するにはパスワードを入力してください。
+              This action cannot be undone. Please enter your password to delete.
             </p>
             
             <input
               type="password"
               value={deletePassword}
               onChange={(e) => setDeletePassword(e.target.value)}
-              placeholder="パスワード"
+              placeholder="Password"
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-gray-500 mb-2"
               disabled={deleting}
             />
@@ -293,25 +344,32 @@ export default function FragmentCard({ fragment }: FragmentCardProps) {
                 className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800 transition-colors"
                 disabled={deleting}
               >
-                キャンセル
+                Cancel
               </button>
               <button
                 onClick={handleDelete}
                 disabled={!deletePassword || deleting}
                 className="px-4 py-2 bg-red-600 text-white text-sm rounded-md hover:bg-red-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
               >
-                {deleting ? '削除中...' : '削除'}
+                {deleting ? 'Deleting...' : 'Delete'}
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* フルスクリーンモーダル */}
+      {/* Fullscreen modal */}
       <FullscreenModal
         fragment={fragment}
         isOpen={showFullscreen}
         onClose={() => setShowFullscreen(false)}
+      />
+
+      {/* Toast notification */}
+      <Toast
+        message={toastMessage}
+        isVisible={showToast}
+        onClose={() => setShowToast(false)}
       />
     </div>
   )
