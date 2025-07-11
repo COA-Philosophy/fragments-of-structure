@@ -133,16 +133,7 @@ export default function ResonanceButton({
         )}
       </div>
 
-      {/* ツールチップ - 左側配置 */}
-      <div className="absolute bottom-full left-0 mb-2 
-                      opacity-0 group-hover:opacity-100 transition-opacity duration-300 
-                      pointer-events-none z-10">
-        <div className="bg-[#1c1c1c] text-[#f9f8f6] text-xs px-2 py-1 rounded 
-                        whitespace-nowrap shadow-lg">
-          {isResonated ? '共鳴した' : '共鳴する'}
-        </div>
-        <div className="w-2 h-2 bg-[#1c1c1c] transform rotate-45 absolute top-full left-3 -mt-1"></div>
-      </div>
+      {/* ツールチップ削除（この部分を完全削除） */}
     </button>
   )
 }

@@ -9,9 +9,15 @@ import { CreateFragmentModal } from '@/components/create/CreateFragmentModal'
 export default function Home() {
   const [showIntro, setShowIntro] = useState(true)
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
+  const [refreshKey, setRefreshKey] = useState(0) // ギャラリー更新用
 
   const handleIntroComplete = () => {
     setShowIntro(false)
+  }
+
+  const handleFragmentCreated = () => {
+    // ページリロードの代わりにギャラリーを更新
+    setRefreshKey(prev => prev + 1)
   }
 
   return (
@@ -21,8 +27,8 @@ export default function Home() {
       ) : (
         <>
           <main className="min-h-screen bg-[#f9f8f6]">
-            {/* GalleryViewは自分でデータを取得するので、propsは不要 */}
-            <GalleryView />
+            {/* refreshKeyでギャラリーを更新 */}
+            <GalleryView key={refreshKey} />
           </main>
 
           {/* 投稿ボタン */}
@@ -31,11 +37,8 @@ export default function Home() {
           {/* 投稿モーダル */}
           <CreateFragmentModal
             isOpen={isCreateModalOpen}
-            onClose={() => {
-              setIsCreateModalOpen(false)
-              // モーダルを閉じた後、ページをリロードして新しい投稿を表示
-              window.location.reload()
-            }}
+            onClose={() => setIsCreateModalOpen(false)}
+            onSuccess={handleFragmentCreated} // 成功時にギャラリー更新
           />
         </>
       )}

@@ -73,14 +73,15 @@ export default function FragmentCard({ fragment, index = 0 }: FragmentCardProps)
     }
   }, [menuOpen])
 
-  // 削除処理
+  // 削除処理（POSTメソッドに変更）
   const handleDelete = async () => {
     if (!deletePassword) return
 
     setDeleting(true)
     try {
-      const response = await fetch(`/api/fragments/${fragment.id}`, {
-        method: 'DELETE',
+      // DELETEからPOSTに変更（URLパスも調整）
+      const response = await fetch(`/api/fragments/${fragment.id}/delete`, {
+        method: 'POST', // 変更箇所
         headers: {
           'Content-Type': 'application/json',
         },
@@ -161,16 +162,16 @@ export default function FragmentCard({ fragment, index = 0 }: FragmentCardProps)
               </AnimatePresence>
 
               {/* サムネイル画像 */}
-<motion.img
-  src={`${fragment.thumbnail_url}?f_auto,q_auto`}
-  alt={fragment.title}
-  onLoad={handleImageLoad}
-  onError={handleImageError}
-  className="w-full h-full object-cover"
-  initial={{ opacity: 0 }}
-  animate={{ opacity: imageLoaded ? 1 : 0 }}
-  transition={{ duration: 0.6 }}
-/>
+              <motion.img
+                src={`${fragment.thumbnail_url}?f_auto,q_auto`}
+                alt={fragment.title}
+                onLoad={handleImageLoad}
+                onError={handleImageError}
+                className="w-full h-full object-cover"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: imageLoaded ? 1 : 0 }}
+                transition={{ duration: 0.6 }}
+              />
             </>
           ) : (
             /* Canvas フォールバック */
