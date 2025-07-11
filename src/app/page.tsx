@@ -4,7 +4,7 @@ import { useState } from 'react'
 import Intro from '@/components/intro/Intro'
 import GalleryView from '@/components/gallery/GalleryView'
 import CreateButton from '@/components/create/CreateButton'
-import CreateFragmentModal from '@/components/create/CreateFragmentModal'
+import { CreateFragmentModal } from '@/components/create/CreateFragmentModal'
 
 export default function Home() {
   const [showIntro, setShowIntro] = useState(true)

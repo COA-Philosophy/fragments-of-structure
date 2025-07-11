@@ -76,13 +76,13 @@ export default function WhisperButton({
           </svg>
         </div>
         
-        {/* ツールチップ - 右側配置 */}
+        {/* ツールチップ - 右側配置（位置修正） */}
         <div className="absolute bottom-full right-0 mb-2 
                         opacity-0 group-hover:opacity-100 transition-opacity duration-300 
-                        pointer-events-none z-10">
+                        pointer-events-none z-20">
           <div className="bg-[#1c1c1c] text-[#f9f8f6] text-xs px-2 py-1 rounded 
                           whitespace-nowrap shadow-lg">
-            言葉を添える{whisperCount > 0 && ` (${whisperCount})`}
+            言葉を添える / Leave a whisper
           </div>
           <div className="w-2 h-2 bg-[#1c1c1c] transform rotate-45 absolute top-full right-3 -mt-1"></div>
         </div>

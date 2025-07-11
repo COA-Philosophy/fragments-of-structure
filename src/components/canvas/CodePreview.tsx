@@ -5,9 +5,9 @@ import { executeCanvasCode, analyzeCodeType } from '@/utils/codeExecutor'
 
 interface CodePreviewProps {
   code: string
-  fragmentId?: string  // オプショナルに変更（?を追加）
+  fragmentId?: string
   className?: string
-  isFullscreen?: boolean  // フルスクリーンかどうか
+  isFullscreen?: boolean
 }
 
 export default function CodePreview({ code, fragmentId = 'preview', className = '', isFullscreen = false }: CodePreviewProps) {
@@ -82,7 +82,7 @@ export default function CodePreview({ code, fragmentId = 'preview', className = 
       canvas.style.top = '0'
       canvas.style.left = '0'
       canvas.style.zIndex = '9999'
-      canvas.style.backgroundColor = 'black'  // 背景を黒に
+      canvas.style.backgroundColor = 'black'
       
       console.log('Fullscreen canvas set to:', screenWidth, 'x', screenHeight)
     } else {
@@ -173,16 +173,6 @@ export default function CodePreview({ code, fragmentId = 'preview', className = 
             <div className="text-sm text-gray-300 mb-1">⚠️</div>
             <div className="text-xs text-gray-400">{error}</div>
           </div>
-        </div>
-      )}
-      
-      {/* デバッグ情報（開発時のみ） */}
-      {process.env.NODE_ENV === 'development' && canvasRef.current && (
-        <div className="absolute bottom-4 left-4 text-xs text-white bg-black/70 px-2 py-1 rounded pointer-events-none z-50">
-          {codeType} #{fragmentId} 
-          {isFullscreen 
-            ? ` (FS: Canvas ${canvasRef.current.width}x${canvasRef.current.height}, Style: ${canvasRef.current.style.width}x${canvasRef.current.style.height})` 
-            : ''}
         </div>
       )}
     </div>

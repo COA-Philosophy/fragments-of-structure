@@ -1,80 +1,127 @@
-'use client'
-
-import { useState, useEffect, useRef } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
-import { X } from 'lucide-react'
-import CodePreview from '../canvas/CodePreview'
+import React, { useState, useRef, useCallback, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { supabase } from '@/lib/supabase';
+import CodePreview from '../canvas/CodePreview';
+import { canvasToWebP, uploadToCloudinary, getErrorMessage } from '@/lib/cloudinaryUtils';
+import toast from 'react-hot-toast';
 
 interface CreateFragmentModalProps {
-  isOpen: boolean
-  onClose: () => void
+  isOpen: boolean;
+  onClose: () => void;
+  onSuccess?: () => void;
 }
 
-type FragmentType = 'canvas' | 'three' | 'glsl' | 'svg' | 'css'
+export const CreateFragmentModal: React.FC<CreateFragmentModalProps> = ({
+  isOpen,
+  onClose,
+  onSuccess
+}) => {
+  const [title, setTitle] = useState('');
+  const [code, setCode] = useState('');
+  const [prompt, setPrompt] = useState('');
+  const [description, setDescription] = useState('');
+  const [password, setPassword] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isCapturing, setIsCapturing] = useState(false);
+  const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
+  const [fragmentId, setFragmentId] = useState<string | null>(null);
+  
+  const modalRef = useRef<HTMLDivElement>(null);
+  const previewContainerRef = useRef<HTMLDivElement>(null);
 
-export default function CreateFragmentModal({ isOpen, onClose }: CreateFragmentModalProps) {
-  const [step, setStep] = useState(1)
-  const [formData, setFormData] = useState({
-    title: '',
-    code: '',
-    type: 'canvas' as FragmentType,
-    prompt: '',
-    description: '',
-    password: ''
-  })
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [showPreview, setShowPreview] = useState(false)
-  const codeTextareaRef = useRef<HTMLTextAreaElement>(null)
-
-  useEffect(() => {
-    const handleEsc = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
+  // 痕跡をキャプチャ
+  const handleCapture = useCallback(async () => {
+    const canvas = previewContainerRef.current?.querySelector('canvas');
+    
+    if (!canvas || !(canvas instanceof HTMLCanvasElement)) {
+      toast.error('プレビューが準備できていません / Preview not ready');
+      return;
     }
-    if (isOpen) {
-      document.addEventListener('keydown', handleEsc)
-      document.body.style.overflow = 'hidden'
-    }
-    return () => {
-      document.removeEventListener('keydown', handleEsc)
-      document.body.style.overflow = 'unset'
-    }
-  }, [isOpen, onClose])
 
-  const handleSubmit = async () => {
-    if (!formData.title || !formData.code || !formData.password) return
+    setIsCapturing(true);
+    toast('痕跡を保存中... / Capturing...', { icon: '📸' });
 
-    setIsSubmitting(true)
     try {
-      const response = await fetch('/api/fragments', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
-      })
+      const blob = await canvasToWebP(canvas, {
+        quality: 0.9,
+        maxWidth: 1200,
+        maxHeight: 900
+      });
 
-      if (response.ok) {
-        onClose()
-        window.location.reload()
-      }
+      const tempId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      setFragmentId(tempId);
+
+      const cloudinaryResponse = await uploadToCloudinary(blob, tempId);
+      setThumbnailUrl(cloudinaryResponse.secure_url);
+      
+      toast.success('痕跡を保存しました / Trace captured successfully');
     } catch (error) {
-      console.error('Failed to create fragment:', error)
+      console.error('Capture error:', error);
+      toast.error(getErrorMessage(error));
     } finally {
-      setIsSubmitting(false)
+      setIsCapturing(false);
     }
-  }
+  }, []);
 
-  const handleCodeChange = (value: string) => {
-    setFormData({ ...formData, code: value })
-    // 簡易的なコード解析でtypeを自動判定
-    if (value.includes('THREE.') || value.includes('new THREE')) {
-      setFormData(prev => ({ ...prev, type: 'three' }))
-    } else if (value.includes('gl_FragCoord') || value.includes('gl_Position')) {
-      setFormData(prev => ({ ...prev, type: 'glsl' }))
-    } else if (value.includes('<svg') || value.includes('createElementNS')) {
-      setFormData(prev => ({ ...prev, type: 'svg' }))
-    } else if (value.includes('@keyframes') || value.includes('animation:')) {
-      setFormData(prev => ({ ...prev, type: 'css' }))
+  // フォーム送信
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (isSubmitting) return;
+
+    setIsSubmitting(true);
+
+    try {
+      // パスワードのハッシュ化（実際の実装では適切なハッシュ関数を使用）
+      const passwordHash = btoa(password); // 簡易実装
+
+      // Fragmentの作成
+      const { data, error } = await supabase
+        .from('fragments')
+        .insert({
+          title,
+          code,
+          prompt: prompt || null,
+          description: description || null,
+          password_hash: passwordHash,
+          thumbnail_url: thumbnailUrl,
+          forked_from: null,
+          has_params: false,
+          params_config: null
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      // 成功通知
+      toast.success('Fragmentを投稿しました / Fragment posted successfully');
+      
+      // リセット
+      setTitle('');
+      setCode('');
+      setPrompt('');
+      setDescription('');
+      setPassword('');
+      setThumbnailUrl(null);
+      setFragmentId(null);
+      
+      onSuccess?.();
+      onClose();
+    } catch (error) {
+      console.error('Submit error:', error);
+      toast.error('投稿に失敗しました / Failed to post fragment');
+    } finally {
+      setIsSubmitting(false);
     }
-  }
+  };
+
+  // クリーンアップ
+  useEffect(() => {
+    if (!isOpen) {
+      setThumbnailUrl(null);
+      setFragmentId(null);
+    }
+  }, [isOpen]);
 
   return (
     <AnimatePresence>
@@ -83,247 +130,303 @@ export default function CreateFragmentModal({ isOpen, onClose }: CreateFragmentM
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90"
-          onClick={(e) => e.target === e.currentTarget && onClose()}
+          className="fixed inset-0 z-40 flex items-center justify-center p-4"
+          style={{ backgroundColor: 'rgba(249, 248, 246, 0.95)' }}
         >
           <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 20 }}
-            transition={{ delay: 0.1 }}
-            className="relative w-full max-w-4xl max-h-[90vh] overflow-y-auto bg-[#f9f8f6] rounded-sm"
+            ref={modalRef}
+            initial={{ scale: 0.95, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.95, opacity: 0 }}
+            transition={{ duration: 0.3, ease: [0.19, 1, 0.22, 1] }}
+            className="w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-lg shadow-2xl"
+            style={{ backgroundColor: '#f9f8f6' }}
           >
             {/* ヘッダー */}
-            <div className="sticky top-0 z-10 flex items-center justify-between p-8 bg-[#f9f8f6] border-b border-[#3a3a3a]/10">
-              <h2 className="text-2xl font-light tracking-wide text-[#1c1c1c]">
-                構造を残す
+            <div className="sticky top-0 z-10 flex items-center justify-between p-6 border-b"
+              style={{ borderColor: '#3a3a3a20', backgroundColor: '#f9f8f6' }}
+            >
+              <h2 
+                className="text-2xl"
+                style={{
+                  fontFamily: "'Satoshi', sans-serif",
+                  fontWeight: 300,
+                  letterSpacing: '0.05em',
+                  color: '#1c1c1c'
+                }}
+              >
+                Create Fragment
               </h2>
               <button
                 onClick={onClose}
-                className="p-2 transition-opacity hover:opacity-60"
+                className="p-2 rounded transition-all duration-200 hover:bg-black/5"
+                aria-label="Close"
               >
-                <X size={24} className="text-[#6a6a6a]" />
+                <svg
+                  width="24"
+                  height="24"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="#1c1c1c"
+                  strokeWidth="1.5"
+                >
+                  <path d="M18 6L6 18M6 6l12 12" />
+                </svg>
               </button>
             </div>
 
-            <div className="p-8">
-              {/* Step 1: 基本情報 */}
-              {step === 1 && (
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="space-y-8"
+            {/* フォーム */}
+            <form onSubmit={handleSubmit} className="p-6 space-y-6">
+              {/* タイトル */}
+              <div>
+                <label 
+                  htmlFor="title"
+                  className="block mb-2 text-sm"
+                  style={{ color: '#6a6a6a', letterSpacing: '0.05em' }}
                 >
-                  {/* タイトル */}
-                  <div>
-                    <label className="block mb-2 text-sm text-[#6a6a6a]">
-                      タイトル
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.title}
-                      onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                      maxLength={50}
-                      placeholder="作品に名前をつけてください"
-                      className="w-full px-4 py-3 bg-white border border-[#3a3a3a]/20 rounded-sm focus:outline-none focus:border-[#3a3a3a]/40 transition-colors"
-                    />
-                    <p className="mt-1 text-xs text-[#6a6a6a]">
-                      {formData.title.length}/50
-                    </p>
-                  </div>
+                  タイトル / Title *
+                </label>
+                <input
+                  id="title"
+                  type="text"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  required
+                  maxLength={50}
+                  className="w-full px-4 py-3 rounded border transition-all duration-200 focus:outline-none"
+                  style={{
+                    borderColor: '#3a3a3a20',
+                    backgroundColor: '#ffffff',
+                    fontFamily: "'Satoshi', sans-serif"
+                  }}
+                  placeholder="Fragment title..."
+                />
+              </div>
 
-                  {/* タイプ選択 */}
-                  <div>
-                    <label className="block mb-2 text-sm text-[#6a6a6a]">
-                      表現形式
-                    </label>
-                    <div className="grid grid-cols-5 gap-2">
-                      {(['canvas', 'three', 'glsl', 'svg', 'css'] as const).map((type) => (
-                        <button
-                          key={type}
-                          onClick={() => setFormData({ ...formData, type })}
-                          className={`px-4 py-2 text-sm rounded-sm transition-all ${
-                            formData.type === type
-                              ? 'bg-[#1c1c1c] text-[#f9f8f6]'
-                              : 'bg-white border border-[#3a3a3a]/20 text-[#1c1c1c] hover:border-[#3a3a3a]/40'
-                          }`}
-                        >
-                          {type}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
+              {/* コード */}
+              <div>
+                <label 
+                  htmlFor="code"
+                  className="block mb-2 text-sm"
+                  style={{ color: '#6a6a6a', letterSpacing: '0.05em' }}
+                >
+                  コード / Code *
+                </label>
+                <textarea
+                  id="code"
+                  value={code}
+                  onChange={(e) => setCode(e.target.value)}
+                  required
+                  rows={12}
+                  className="w-full px-4 py-3 rounded border font-mono text-sm transition-all duration-200 focus:outline-none"
+                  style={{
+                    borderColor: '#3a3a3a20',
+                    backgroundColor: '#ffffff',
+                    fontFamily: "'JetBrains Mono', monospace"
+                  }}
+                  placeholder="HTML, CSS, JavaScript..."
+                />
+              </div>
 
-                  {/* 説明文 */}
-                  <div>
-                    <label className="block mb-2 text-sm text-[#6a6a6a]">
-                      説明文（任意）
-                    </label>
-                    <textarea
-                      value={formData.description}
-                      onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                      maxLength={200}
-                      rows={3}
-                      placeholder="作品について一言"
-                      className="w-full px-4 py-3 bg-white border border-[#3a3a3a]/20 rounded-sm focus:outline-none focus:border-[#3a3a3a]/40 transition-colors resize-none"
-                    />
-                    <p className="mt-1 text-xs text-[#6a6a6a]">
-                      {formData.description.length}/200
-                    </p>
-                  </div>
-
-                  <button
-                    onClick={() => setStep(2)}
-                    disabled={!formData.title}
-                    className="w-full py-4 bg-[#1c1c1c] text-[#f9f8f6] rounded-sm hover:opacity-90 transition-opacity disabled:opacity-40"
+              {/* カード形式プレビュー */}
+              {code && (
+                <div className="relative">
+                  <label 
+                    className="block mb-2 text-sm"
+                    style={{ color: '#6a6a6a', letterSpacing: '0.05em' }}
                   >
-                    次へ：コードを書く
-                  </button>
-                </motion.div>
-              )}
-
-              {/* Step 2: コード入力 */}
-              {step === 2 && (
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="space-y-8"
-                >
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg text-[#1c1c1c]">コード</h3>
-                    <button
-                      onClick={() => setShowPreview(!showPreview)}
-                      className="px-4 py-2 text-sm border border-[#3a3a3a]/20 rounded-sm hover:border-[#3a3a3a]/40 transition-colors"
+                    プレビュー / Preview（このように表示されます）
+                  </label>
+                  
+                  {/* カード形式のプレビュー */}
+                  <div className="max-w-sm mx-auto">
+                    <div 
+                      className="bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm"
                     >
-                      {showPreview ? 'エディタに戻る' : 'プレビューを見る'}
-                    </button>
-                  </div>
-
-                  {!showPreview ? (
-                    <>
-                      <textarea
-                        ref={codeTextareaRef}
-                        value={formData.code}
-                        onChange={(e) => handleCodeChange(e.target.value)}
-                        placeholder="// あなたの構造をここに"
-                        className="w-full h-96 px-4 py-3 font-mono text-sm bg-white border border-[#3a3a3a]/20 rounded-sm focus:outline-none focus:border-[#3a3a3a]/40 transition-colors resize-none"
-                        spellCheck={false}
-                      />
-
-                      {/* プロンプト（任意） */}
-                      <div>
-                        <label className="block mb-2 text-sm text-[#6a6a6a]">
-                          プロンプト（AIで生成した場合）
-                        </label>
-                        <textarea
-                          value={formData.prompt}
-                          onChange={(e) => setFormData({ ...formData, prompt: e.target.value })}
-                          rows={2}
-                          placeholder="使用したプロンプトがあれば"
-                          className="w-full px-4 py-3 bg-white border border-[#3a3a3a]/20 rounded-sm focus:outline-none focus:border-[#3a3a3a]/40 transition-colors resize-none"
+                      {/* サムネイル部分（ギャラリーと同じ高さ） */}
+                      <div 
+                        ref={previewContainerRef}
+                        className="relative w-full h-64 bg-gray-50 overflow-hidden"
+                      >
+                        <CodePreview
+                          code={code}
+                          fragmentId="create-preview"
+                          className="w-full h-full"
                         />
+                        
+                        {/* Fragment番号の例 */}
+                        <div className="absolute top-2 left-2 bg-white/90 backdrop-blur-sm px-2 py-1 rounded text-xs text-gray-600">
+                          Fragment XXX
+                        </div>
                       </div>
-                    </>
-                  ) : (
-                    <div className="h-96 bg-black rounded-sm overflow-hidden">
-                      <CodePreview code={formData.code} />
+                      
+                      {/* カード情報部分 */}
+                      <div className="p-4">
+                        <h3 className="text-lg font-medium text-gray-900 mb-2">
+                          {title || 'タイトル未入力'}
+                        </h3>
+                        {description && (
+                          <p className="text-sm text-gray-600 line-clamp-2">
+                            {description}
+                          </p>
+                        )}
+                      </div>
                     </div>
-                  )}
-
-                  <div className="flex gap-4">
-                    <button
-                      onClick={() => setStep(1)}
-                      className="flex-1 py-4 border border-[#3a3a3a]/20 rounded-sm hover:border-[#3a3a3a]/40 transition-colors"
-                    >
-                      戻る
-                    </button>
-                    <button
-                      onClick={() => setStep(3)}
-                      disabled={!formData.code}
-                      className="flex-1 py-4 bg-[#1c1c1c] text-[#f9f8f6] rounded-sm hover:opacity-90 transition-opacity disabled:opacity-40"
-                    >
-                      次へ：最終確認
-                    </button>
-                  </div>
-                </motion.div>
-              )}
-
-              {/* Step 3: パスワード設定と確認 */}
-              {step === 3 && (
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="space-y-8"
-                >
-                  <div className="p-8 bg-white rounded-sm">
-                    <h3 className="mb-6 text-lg text-[#1c1c1c]">投稿内容の確認</h3>
                     
-                    <div className="space-y-4 text-sm">
-                      <div>
-                        <span className="text-[#6a6a6a]">タイトル：</span>
-                        <span className="text-[#1c1c1c]">{formData.title}</span>
-                      </div>
-                      <div>
-                        <span className="text-[#6a6a6a]">タイプ：</span>
-                        <span className="text-[#1c1c1c]">{formData.type}</span>
-                      </div>
-                      {formData.description && (
-                        <div>
-                          <span className="text-[#6a6a6a]">説明：</span>
-                          <span className="text-[#1c1c1c]">{formData.description}</span>
+                    {/* キャプチャーボタン */}
+                    <div className="mt-4 text-center">
+                      {!thumbnailUrl ? (
+                        <>
+                          <p className="text-xs text-gray-600 mb-2">
+                            アニメーションの場合、お好きな瞬間でキャプチャーできます
+                          </p>
+                          <button
+                            type="button"
+                            onClick={handleCapture}
+                            disabled={isCapturing}
+                            className="px-6 py-2 rounded text-sm transition-all duration-200"
+                            style={{
+                              backgroundColor: isCapturing ? '#6a6a6a' : '#d4af37',
+                              color: '#1c1c1c'
+                            }}
+                          >
+                            {isCapturing ? '保存中...' : '📸 この瞬間を保存'}
+                          </button>
+                        </>
+                      ) : (
+                        <div className="flex items-center justify-center gap-2">
+                          <span className="text-sm text-green-600">✓ サムネイル保存済み</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setThumbnailUrl(null);
+                              handleCapture();
+                            }}
+                            className="text-sm text-gray-600 hover:text-gray-800 underline"
+                          >
+                            別の瞬間を選ぶ
+                          </button>
                         </div>
                       )}
-                      <div>
-                        <span className="text-[#6a6a6a]">コード：</span>
-                        <span className="text-[#1c1c1c]">{formData.code.length}文字</span>
-                      </div>
                     </div>
                   </div>
-
-                  {/* 削除パスワード */}
-                  <div>
-                    <label className="block mb-2 text-sm text-[#6a6a6a]">
-                      削除用パスワード
-                    </label>
-                    <input
-                      type="password"
-                      value={formData.password}
-                      onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                      placeholder="後で削除する際に必要です"
-                      className="w-full px-4 py-3 bg-white border border-[#3a3a3a]/20 rounded-sm focus:outline-none focus:border-[#3a3a3a]/40 transition-colors"
-                    />
-                    <p className="mt-2 text-xs text-[#6a6a6a]">
-                      このパスワードは復元できません。必ず覚えておいてください。
-                    </p>
-                  </div>
-
-                  <div className="pt-8 text-center">
-                    <p className="mb-8 text-sm italic text-[#6a6a6a]">
-                      Not mine. Not yours. Just fragments left behind.
-                    </p>
-                    
-                    <div className="flex gap-4">
-                      <button
-                        onClick={() => setStep(2)}
-                        className="flex-1 py-4 border border-[#3a3a3a]/20 rounded-sm hover:border-[#3a3a3a]/40 transition-colors"
-                      >
-                        戻る
-                      </button>
-                      <button
-                        onClick={handleSubmit}
-                        disabled={!formData.password || isSubmitting}
-                        className="flex-1 py-4 bg-[#1c1c1c] text-[#f9f8f6] rounded-sm hover:opacity-90 transition-opacity disabled:opacity-40"
-                      >
-                        {isSubmitting ? '投稿中...' : '構造を残す'}
-                      </button>
-                    </div>
-                  </div>
-                </motion.div>
+                </div>
               )}
-            </div>
+
+              {/* プロンプト（オプション） */}
+              <div>
+                <label 
+                  htmlFor="prompt"
+                  className="block mb-2 text-sm"
+                  style={{ color: '#6a6a6a', letterSpacing: '0.05em' }}
+                >
+                  プロンプト / Prompt（任意）
+                </label>
+                <textarea
+                  id="prompt"
+                  value={prompt}
+                  onChange={(e) => setPrompt(e.target.value)}
+                  rows={3}
+                  className="w-full px-4 py-3 rounded border transition-all duration-200 focus:outline-none"
+                  style={{
+                    borderColor: '#3a3a3a20',
+                    backgroundColor: '#ffffff',
+                    fontFamily: "'Satoshi', sans-serif"
+                  }}
+                  placeholder="AI生成の場合のプロンプト..."
+                />
+              </div>
+
+              {/* 説明（オプション） */}
+              <div>
+                <label 
+                  htmlFor="description"
+                  className="block mb-2 text-sm"
+                  style={{ color: '#6a6a6a', letterSpacing: '0.05em' }}
+                >
+                  説明 / Description（任意）
+                </label>
+                <textarea
+                  id="description"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  maxLength={200}
+                  rows={2}
+                  className="w-full px-4 py-3 rounded border transition-all duration-200 focus:outline-none"
+                  style={{
+                    borderColor: '#3a3a3a20',
+                    backgroundColor: '#ffffff',
+                    fontFamily: "'Satoshi', sans-serif"
+                  }}
+                  placeholder="作品について..."
+                />
+              </div>
+
+              {/* 削除用パスワード */}
+              <div>
+                <label 
+                  htmlFor="password"
+                  className="block mb-2 text-sm"
+                  style={{ color: '#6a6a6a', letterSpacing: '0.05em' }}
+                >
+                  削除用パスワード / Delete Password *
+                </label>
+                <input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  className="w-full px-4 py-3 rounded border transition-all duration-200 focus:outline-none"
+                  style={{
+                    borderColor: '#3a3a3a20',
+                    backgroundColor: '#ffffff',
+                    fontFamily: "'Satoshi', sans-serif"
+                  }}
+                  placeholder="後で削除する際に必要です..."
+                />
+              </div>
+
+              {/* 送信ボタン */}
+              <div className="flex justify-end gap-4 pt-4">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="px-6 py-3 rounded transition-all duration-200"
+                  style={{
+                    color: '#6a6a6a',
+                    border: '1px solid #3a3a3a20'
+                  }}
+                >
+                  キャンセル / Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmitting || !title || !code || !password}
+                  className="px-8 py-3 rounded transition-all duration-200 disabled:opacity-50"
+                  style={{
+                    backgroundColor: '#1c1c1c',
+                    color: '#f9f8f6'
+                  }}
+                >
+                  {isSubmitting ? (
+                    <span className="flex items-center gap-2">
+                      <motion.span
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                        className="inline-block w-4 h-4 border-2 border-[#f9f8f6] border-t-transparent rounded-full"
+                      />
+                      投稿中...
+                    </span>
+                  ) : (
+                    'Fragment を投稿 / Post Fragment'
+                  )}
+                </button>
+              </div>
+            </form>
           </motion.div>
         </motion.div>
       )}
     </AnimatePresence>
-  )
-}
+  );
+};
