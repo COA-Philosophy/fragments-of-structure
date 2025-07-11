@@ -3,8 +3,24 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { supabase } from '@/lib/supabase';
 import CodePreview from '../canvas/CodePreview';
 import { canvasToWebP, uploadToCloudinary, getErrorMessage } from '@/lib/cloudinaryUtils';
+import { generateUserIpHash } from '@/lib/hashUtils';
 import toast from 'react-hot-toast';
 import crypto from 'crypto';
+
+// 🆕 バイリンガル投稿フォームの型定義
+interface BilingualFormData {
+  // バイリンガルフィールド
+  title_primary: string;
+  title_secondary: string;
+  description_primary: string;
+  description_secondary: string;
+  primary_language: 'en' | 'ja';
+  
+  // 既存フィールド
+  code: string;
+  prompt: string;
+  password: string;
+}
 
 interface CreateFragmentModalProps {
   isOpen: boolean;
@@ -17,11 +33,18 @@ export const CreateFragmentModal: React.FC<CreateFragmentModalProps> = ({
   onClose,
   onSuccess
 }) => {
-  const [title, setTitle] = useState('');
-  const [code, setCode] = useState('');
-  const [prompt, setPrompt] = useState('');
-  const [description, setDescription] = useState('');
-  const [password, setPassword] = useState('');
+  // 🆕 バイリンガル状態管理
+  const [formData, setFormData] = useState<BilingualFormData>({
+    title_primary: '',
+    title_secondary: '',
+    description_primary: '',
+    description_secondary: '',
+    primary_language: 'en',
+    code: '',
+    prompt: '',
+    password: ''
+  });
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isCapturing, setIsCapturing] = useState(false);
   const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
@@ -32,25 +55,42 @@ export const CreateFragmentModal: React.FC<CreateFragmentModalProps> = ({
 
   // パスワードハッシュ化関数（削除APIと同じ方式に統一）
   const hashPassword = (password: string): string => {
-    // テスト用の特別処理
     if (password === '123') {
       return 'a665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3';
     }
-    
-    // 通常のSHA256ハッシュ化
-    return crypto
-      .createHash('sha256')
-      .update(password)
-      .digest('hex');
+    return crypto.createHash('sha256').update(password).digest('hex');
   };
 
-  // モーダルが閉じられた時の完全リセット（アニメーション制御）
+  // 🆕 フォーム更新ヘルパー
+  const updateField = (field: keyof BilingualFormData, value: string) => {
+    setFormData(prev => ({ ...prev, [field]: value }));
+  };
+
+  // 🆕 言語切り替え
+  const switchPrimaryLanguage = () => {
+    setFormData(prev => ({
+      ...prev,
+      primary_language: prev.primary_language === 'en' ? 'ja' : 'en',
+      // タイトルと説明を入れ替え
+      title_primary: prev.title_secondary,
+      title_secondary: prev.title_primary,
+      description_primary: prev.description_secondary,
+      description_secondary: prev.description_primary
+    }));
+  };
+
+  // モーダルが閉じられた時の完全リセット
   const resetFormState = useCallback(() => {
-    setTitle('');
-    setCode('');
-    setPrompt('');
-    setDescription('');
-    setPassword('');
+    setFormData({
+      title_primary: '',
+      title_secondary: '',
+      description_primary: '',
+      description_secondary: '',
+      primary_language: 'en',
+      code: '',
+      prompt: '',
+      password: ''
+    });
     setThumbnailUrl(null);
     setFragmentId(null);
     setIsSubmitting(false);
@@ -91,7 +131,7 @@ export const CreateFragmentModal: React.FC<CreateFragmentModalProps> = ({
     }
   }, []);
 
-  // フォーム送信（パスワードハッシュ化統一）
+  // 🆕 バイリンガル対応フォーム送信
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isSubmitting) return;
@@ -99,29 +139,59 @@ export const CreateFragmentModal: React.FC<CreateFragmentModalProps> = ({
     setIsSubmitting(true);
 
     try {
-      // パスワードハッシュ化を削除APIと同じ方式に統一
-      const passwordHash = hashPassword(password);
+      // 🔐 創作者ハッシュ生成
+      const creatorHash = generateUserIpHash();
 
-      console.log('Password hash being saved:', passwordHash); // デバッグ用
+      console.log('🎨 Submitting bilingual fragment:', {
+        creator_hash: creatorHash,
+        primary_language: formData.primary_language,
+        title_primary: formData.title_primary,
+        title_secondary: formData.title_secondary || undefined
+      });
 
-      // Fragmentの作成
-      const { data, error } = await supabase
-        .from('fragments')
-        .insert({
-          title,
-          code,
-          prompt: prompt || null,
-          description: description || null,
-          password_hash: passwordHash, // 統一されたハッシュ化
-          thumbnail_url: thumbnailUrl,
-          forked_from: null,
-          has_params: false,
-          params_config: null
-        })
-        .select()
-        .single();
+      // 🆕 バイリンガル対応API送信
+      const requestBody = {
+        // バイリンガルフィールド
+        title_primary: formData.title_primary,
+        title_secondary: formData.title_secondary || undefined,
+        description_primary: formData.description_primary || undefined,
+        description_secondary: formData.description_secondary || undefined,
+        primary_language: formData.primary_language,
+        
+        // 創作者情報
+        creator_hash: creatorHash,
+        
+        // 既存フィールド
+        code: formData.code,
+        prompt: formData.prompt || undefined,
+        password: formData.password, // APIでハッシュ化
+        thumbnail_url: thumbnailUrl,
+        
+        // 🔄 既存システム互換性フィールド
+        title: formData.title_primary,
+        description: formData.description_primary || undefined
+      };
 
-      if (error) throw error;
+      console.log('🚀 Sending request to API...', {
+        title_primary: requestBody.title_primary,
+        creator_hash: requestBody.creator_hash
+      });
+
+      // Fragment作成API呼び出し
+      const response = await fetch('/api/fragments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(requestBody)
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to create fragment');
+      }
+
+      const { fragment } = await response.json();
+
+      console.log('✅ Fragment created successfully:', fragment);
 
       // 成功通知
       toast.success('Fragmentを投稿しました / Fragment posted successfully');
@@ -131,7 +201,6 @@ export const CreateFragmentModal: React.FC<CreateFragmentModalProps> = ({
       
       // 成功コールバック（モーダルが閉じた後）
       if (onSuccess) {
-        // 少し遅延を入れてコールバック実行（アニメーション競合回避）
         setTimeout(() => {
           onSuccess();
         }, 300);
@@ -140,24 +209,22 @@ export const CreateFragmentModal: React.FC<CreateFragmentModalProps> = ({
     } catch (error) {
       console.error('Submit error:', error);
       toast.error('投稿に失敗しました / Failed to post fragment');
-      setIsSubmitting(false); // エラー時のみここでリセット
+      setIsSubmitting(false);
     }
   };
 
-  // モーダル閉じる処理（確実なリセット）
+  // モーダル閉じる処理
   const handleClose = useCallback(() => {
     resetFormState();
     onClose();
   }, [resetFormState, onClose]);
 
-  // isOpenが変更された時の処理（アニメーション制御）
+  // モーダル制御
   useEffect(() => {
     if (!isOpen) {
-      // モーダルが閉じられた時に確実にリセット
       const timeoutId = setTimeout(() => {
         resetFormState();
-      }, 300); // exitアニメーション完了後にリセット
-
+      }, 300);
       return () => clearTimeout(timeoutId);
     }
   }, [isOpen, resetFormState]);
@@ -178,89 +245,195 @@ export const CreateFragmentModal: React.FC<CreateFragmentModalProps> = ({
             animate={{ scale: 1, opacity: 1 }}
             exit={{ scale: 0.95, opacity: 0 }}
             transition={{ duration: 0.3, ease: [0.19, 1, 0.22, 1] }}
-            className="w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-lg shadow-2xl"
+            className="w-full max-w-5xl max-h-[90vh] overflow-y-auto rounded-lg shadow-2xl"
             style={{ backgroundColor: '#f9f8f6' }}
           >
             {/* ヘッダー */}
             <div className="sticky top-0 z-10 flex items-center justify-between p-6 border-b"
               style={{ borderColor: '#3a3a3a20', backgroundColor: '#f9f8f6' }}
             >
-              <h2 
-                className="text-2xl"
-                style={{
-                  fontFamily: "'Satoshi', sans-serif",
-                  fontWeight: 300,
-                  letterSpacing: '0.05em',
-                  color: '#1c1c1c'
-                }}
-              >
-                Create Fragment
-              </h2>
+              <div>
+                <h2 
+                  className="text-2xl"
+                  style={{
+                    fontFamily: "'Satoshi', sans-serif",
+                    fontWeight: 300,
+                    letterSpacing: '0.05em',
+                    color: '#1c1c1c'
+                  }}
+                >
+                  Create Fragment
+                </h2>
+                <p className="text-sm opacity-70 mt-1">
+                  構造のかけらを残す / Leave a fragment of structure
+                </p>
+              </div>
               <button
                 onClick={handleClose}
                 className="p-2 rounded transition-all duration-200 hover:bg-black/5"
                 aria-label="Close"
-                disabled={isSubmitting} // 投稿中は閉じられないように
+                disabled={isSubmitting}
               >
-                <svg
-                  width="24"
-                  height="24"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="#1c1c1c"
-                  strokeWidth="1.5"
-                >
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#1c1c1c" strokeWidth="1.5">
                   <path d="M18 6L6 18M6 6l12 12" />
                 </svg>
               </button>
             </div>
 
             {/* フォーム */}
-            <form onSubmit={handleSubmit} className="p-6 space-y-6">
-              {/* タイトル */}
-              <div>
-                <label 
-                  htmlFor="title"
-                  className="block mb-2 text-sm"
-                  style={{ color: '#6a6a6a', letterSpacing: '0.05em' }}
-                >
-                  タイトル / Title *
-                </label>
-                <input
-                  id="title"
-                  type="text"
-                  value={title}
-                  onChange={(e) => setTitle(e.target.value)}
-                  required
-                  maxLength={50}
-                  disabled={isSubmitting}
-                  className="w-full px-4 py-3 rounded border transition-all duration-200 focus:outline-none disabled:opacity-50"
-                  style={{
-                    borderColor: '#3a3a3a20',
-                    backgroundColor: '#ffffff',
-                    fontFamily: "'Satoshi', sans-serif"
-                  }}
-                  placeholder="Fragment title..."
-                />
+            <form onSubmit={handleSubmit} className="p-6 space-y-8">
+              
+              {/* 🆕 バイリンガルタイトルセクション */}
+              <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-medium" style={{ color: '#1c1c1c' }}>
+                    Title / タイトル
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={switchPrimaryLanguage}
+                    className="px-3 py-1 text-xs rounded border transition-all duration-200 hover:bg-black/5"
+                    style={{ borderColor: '#3a3a3a20', color: '#6a6a6a' }}
+                  >
+                    主言語: {formData.primary_language === 'en' ? 'English' : '日本語'} ⇄
+                  </button>
+                </div>
+
+                {/* プライマリタイトル */}
+                <div>
+                  <label 
+                    className="block mb-2 text-sm font-medium"
+                    style={{ color: '#1c1c1c' }}
+                  >
+                    {formData.primary_language === 'en' ? 'English Title' : '日本語タイトル'} *
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.title_primary}
+                    onChange={(e) => updateField('title_primary', e.target.value)}
+                    required
+                    maxLength={50}
+                    disabled={isSubmitting}
+                    className="w-full px-4 py-3 rounded border transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[#d4af37] disabled:opacity-50"
+                    style={{
+                      borderColor: '#3a3a3a20',
+                      backgroundColor: '#ffffff',
+                      fontFamily: formData.primary_language === 'en' ? "'Satoshi', sans-serif" : "'Yu Mincho', serif",
+                      fontSize: formData.primary_language === 'en' ? '1rem' : '1.1rem'
+                    }}
+                    placeholder={formData.primary_language === 'en' ? 'Ethereal Particles' : '粒子の詩'}
+                  />
+                </div>
+
+                {/* セカンダリタイトル */}
+                <div>
+                  <label 
+                    className="block mb-2 text-sm"
+                    style={{ color: '#6a6a6a' }}
+                  >
+                    {formData.primary_language === 'en' ? '日本語タイトル（副題）' : 'English Title (Subtitle)'} 
+                    <span className="ml-1 text-xs opacity-70">任意</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.title_secondary}
+                    onChange={(e) => updateField('title_secondary', e.target.value)}
+                    maxLength={50}
+                    disabled={isSubmitting}
+                    className="w-full px-4 py-3 rounded border transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[#d4af37] disabled:opacity-50"
+                    style={{
+                      borderColor: '#3a3a3a20',
+                      backgroundColor: '#ffffff',
+                      fontFamily: formData.primary_language === 'en' ? "'Yu Mincho', serif" : "'Satoshi', sans-serif",
+                      fontSize: formData.primary_language === 'en' ? '1.1rem' : '1rem',
+                      opacity: 0.8
+                    }}
+                    placeholder={formData.primary_language === 'en' ? '粒子の詩' : 'Ethereal Particles'}
+                  />
+                </div>
+              </div>
+
+              {/* 🆕 バイリンガル説明セクション */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium" style={{ color: '#1c1c1c' }}>
+                  Description / 説明
+                </h3>
+
+                {/* プライマリ説明 */}
+                <div>
+                  <label 
+                    className="block mb-2 text-sm font-medium"
+                    style={{ color: '#1c1c1c' }}
+                  >
+                    {formData.primary_language === 'en' ? 'English Description' : '日本語説明'}
+                    <span className="ml-1 text-xs opacity-70">任意</span>
+                  </label>
+                  <textarea
+                    value={formData.description_primary}
+                    onChange={(e) => updateField('description_primary', e.target.value)}
+                    maxLength={200}
+                    rows={3}
+                    disabled={isSubmitting}
+                    className="w-full px-4 py-3 rounded border transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[#d4af37] disabled:opacity-50"
+                    style={{
+                      borderColor: '#3a3a3a20',
+                      backgroundColor: '#ffffff',
+                      fontFamily: formData.primary_language === 'en' ? "'Satoshi', sans-serif" : "'Yu Mincho', serif"
+                    }}
+                    placeholder={formData.primary_language === 'en' ? 
+                      'Dancing particles create ethereal beauty in digital space' : 
+                      'デジタル空間で踊る粒子が幽玄な美を創造する'
+                    }
+                  />
+                </div>
+
+                {/* セカンダリ説明 */}
+                <div>
+                  <label 
+                    className="block mb-2 text-sm"
+                    style={{ color: '#6a6a6a' }}
+                  >
+                    {formData.primary_language === 'en' ? '日本語説明' : 'English Description'}
+                    <span className="ml-1 text-xs opacity-70">任意</span>
+                  </label>
+                  <textarea
+                    value={formData.description_secondary}
+                    onChange={(e) => updateField('description_secondary', e.target.value)}
+                    maxLength={200}
+                    rows={2}
+                    disabled={isSubmitting}
+                    className="w-full px-4 py-3 rounded border transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[#d4af37] disabled:opacity-50"
+                    style={{
+                      borderColor: '#3a3a3a20',
+                      backgroundColor: '#ffffff',
+                      fontFamily: formData.primary_language === 'en' ? "'Yu Mincho', serif" : "'Satoshi', sans-serif",
+                      opacity: 0.8
+                    }}
+                    placeholder={formData.primary_language === 'en' ? 
+                      'デジタル空間で踊る粒子が幽玄な美を創造する' : 
+                      'Dancing particles create ethereal beauty in digital space'
+                    }
+                  />
+                </div>
               </div>
 
               {/* コード */}
               <div>
                 <label 
                   htmlFor="code"
-                  className="block mb-2 text-sm"
-                  style={{ color: '#6a6a6a', letterSpacing: '0.05em' }}
+                  className="block mb-2 text-sm font-medium"
+                  style={{ color: '#1c1c1c' }}
                 >
-                  コード / Code *
+                  Code / コード *
                 </label>
                 <textarea
                   id="code"
-                  value={code}
-                  onChange={(e) => setCode(e.target.value)}
+                  value={formData.code}
+                  onChange={(e) => updateField('code', e.target.value)}
                   required
                   rows={12}
                   disabled={isSubmitting}
-                  className="w-full px-4 py-3 rounded border font-mono text-sm transition-all duration-200 focus:outline-none disabled:opacity-50"
+                  className="w-full px-4 py-3 rounded border font-mono text-sm transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[#d4af37] disabled:opacity-50"
                   style={{
                     borderColor: '#3a3a3a20',
                     backgroundColor: '#ffffff',
@@ -270,46 +443,45 @@ export const CreateFragmentModal: React.FC<CreateFragmentModalProps> = ({
                 />
               </div>
 
-              {/* カード形式プレビュー */}
-              {code && (
+              {/* プレビュー */}
+              {formData.code && (
                 <div className="relative">
                   <label 
-                    className="block mb-2 text-sm"
-                    style={{ color: '#6a6a6a', letterSpacing: '0.05em' }}
+                    className="block mb-4 text-sm font-medium"
+                    style={{ color: '#1c1c1c' }}
                   >
-                    プレビュー / Preview（このように表示されます）
+                    Preview / プレビュー
                   </label>
                   
-                  {/* カード形式のプレビュー */}
                   <div className="max-w-sm mx-auto">
-                    <div 
-                      className="bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm"
-                    >
-                      {/* サムネイル部分（ギャラリーと同じ高さ） */}
+                    <div className="bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm">
                       <div 
                         ref={previewContainerRef}
                         className="relative w-full h-64 bg-gray-50 overflow-hidden"
                       >
                         <CodePreview
-                          code={code}
+                          code={formData.code}
                           fragmentId="create-preview"
                           className="w-full h-full"
                         />
                         
-                        {/* Fragment番号の例 */}
                         <div className="absolute top-2 left-2 bg-white/90 backdrop-blur-sm px-2 py-1 rounded text-xs text-gray-600">
                           Fragment XXX
                         </div>
                       </div>
                       
-                      {/* カード情報部分 */}
                       <div className="p-4">
-                        <h3 className="text-lg font-medium text-gray-900 mb-2">
-                          {title || 'タイトル未入力'}
+                        <h3 className="text-lg font-medium text-gray-900 mb-1">
+                          {formData.title_primary || 'タイトル未入力'}
                         </h3>
-                        {description && (
+                        {formData.title_secondary && (
+                          <h4 className="text-sm text-gray-600 italic mb-2">
+                            {formData.title_secondary}
+                          </h4>
+                        )}
+                        {formData.description_primary && (
                           <p className="text-sm text-gray-600 line-clamp-2">
-                            {description}
+                            {formData.description_primary}
                           </p>
                         )}
                       </div>
@@ -320,7 +492,7 @@ export const CreateFragmentModal: React.FC<CreateFragmentModalProps> = ({
                       {!thumbnailUrl ? (
                         <>
                           <p className="text-xs text-gray-600 mb-2">
-                            アニメーションの場合、お好きな瞬間でキャプチャーできます
+                            この構造がいちばん美しいと感じた瞬間に
                           </p>
                           <button
                             type="button"
@@ -332,12 +504,12 @@ export const CreateFragmentModal: React.FC<CreateFragmentModalProps> = ({
                               color: '#1c1c1c'
                             }}
                           >
-                            {isCapturing ? '保存中...' : '📸 この瞬間を保存'}
+                            {isCapturing ? '保存中...' : '📸 痕跡を残す'}
                           </button>
                         </>
                       ) : (
                         <div className="flex items-center justify-center gap-2">
-                          <span className="text-sm text-green-600">✓ サムネイル保存済み</span>
+                          <span className="text-sm text-green-600">✓ 痕跡を保存しました</span>
                           <button
                             type="button"
                             onClick={() => {
@@ -356,54 +528,30 @@ export const CreateFragmentModal: React.FC<CreateFragmentModalProps> = ({
                 </div>
               )}
 
-              {/* プロンプト（オプション） */}
+              {/* プロンプト */}
               <div>
                 <label 
                   htmlFor="prompt"
-                  className="block mb-2 text-sm"
-                  style={{ color: '#6a6a6a', letterSpacing: '0.05em' }}
+                  className="block mb-2 text-sm font-medium"
+                  style={{ color: '#1c1c1c' }}
                 >
-                  プロンプト / Prompt（任意）
+                  Creative Prompt / プロンプト 
+                  <span className="ml-1 text-xs opacity-70">任意・英語のみ</span>
                 </label>
                 <textarea
                   id="prompt"
-                  value={prompt}
-                  onChange={(e) => setPrompt(e.target.value)}
+                  value={formData.prompt}
+                  onChange={(e) => updateField('prompt', e.target.value)}
                   rows={3}
                   disabled={isSubmitting}
-                  className="w-full px-4 py-3 rounded border transition-all duration-200 focus:outline-none disabled:opacity-50"
+                  className="w-full px-4 py-3 rounded border transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[#d4af37] disabled:opacity-50"
                   style={{
                     borderColor: '#3a3a3a20',
                     backgroundColor: '#ffffff',
-                    fontFamily: "'Satoshi', sans-serif"
+                    fontFamily: "'Satoshi', sans-serif",
+                    fontStyle: 'italic'
                   }}
-                  placeholder="AI生成の場合のプロンプト..."
-                />
-              </div>
-
-              {/* 説明（オプション） */}
-              <div>
-                <label 
-                  htmlFor="description"
-                  className="block mb-2 text-sm"
-                  style={{ color: '#6a6a6a', letterSpacing: '0.05em' }}
-                >
-                  説明 / Description（任意）
-                </label>
-                <textarea
-                  id="description"
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  maxLength={200}
-                  rows={2}
-                  disabled={isSubmitting}
-                  className="w-full px-4 py-3 rounded border transition-all duration-200 focus:outline-none disabled:opacity-50"
-                  style={{
-                    borderColor: '#3a3a3a20',
-                    backgroundColor: '#ffffff',
-                    fontFamily: "'Satoshi', sans-serif"
-                  }}
-                  placeholder="作品について..."
+                  placeholder="Describe the artistic vision behind this creation..."
                 />
               </div>
 
@@ -411,19 +559,19 @@ export const CreateFragmentModal: React.FC<CreateFragmentModalProps> = ({
               <div>
                 <label 
                   htmlFor="password"
-                  className="block mb-2 text-sm"
-                  style={{ color: '#6a6a6a', letterSpacing: '0.05em' }}
+                  className="block mb-2 text-sm font-medium"
+                  style={{ color: '#1c1c1c' }}
                 >
-                  削除用パスワード / Delete Password *
+                  Delete Password / 削除用パスワード *
                 </label>
                 <input
                   id="password"
                   type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  value={formData.password}
+                  onChange={(e) => updateField('password', e.target.value)}
                   required
                   disabled={isSubmitting}
-                  className="w-full px-4 py-3 rounded border transition-all duration-200 focus:outline-none disabled:opacity-50"
+                  className="w-full px-4 py-3 rounded border transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[#d4af37] disabled:opacity-50"
                   style={{
                     borderColor: '#3a3a3a20',
                     backgroundColor: '#ffffff',
@@ -437,7 +585,7 @@ export const CreateFragmentModal: React.FC<CreateFragmentModalProps> = ({
               </div>
 
               {/* 送信ボタン */}
-              <div className="flex justify-end gap-4 pt-4">
+              <div className="flex justify-end gap-4 pt-6">
                 <button
                   type="button"
                   onClick={handleClose}
@@ -452,7 +600,7 @@ export const CreateFragmentModal: React.FC<CreateFragmentModalProps> = ({
                 </button>
                 <button
                   type="submit"
-                  disabled={isSubmitting || !title || !code || !password}
+                  disabled={isSubmitting || !formData.title_primary || !formData.code || !formData.password}
                   className="px-8 py-3 rounded transition-all duration-200 disabled:opacity-50"
                   style={{
                     backgroundColor: '#1c1c1c',
@@ -469,7 +617,7 @@ export const CreateFragmentModal: React.FC<CreateFragmentModalProps> = ({
                       投稿中...
                     </span>
                   ) : (
-                    'Fragment を投稿 / Post Fragment'
+                    'Fragment を投稿 / Leave Fragment'
                   )}
                 </button>
               </div>
