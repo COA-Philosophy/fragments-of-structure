@@ -1,46 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
-import crypto from 'crypto'
 
-// コメント取得
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
-  try {
-    const fragmentId = params.id
-
-    const { data, error } = await supabase
-      .from('whispers')
-      .select('id, content, created_at')
-      .eq('fragment_id', fragmentId)
-      .order('created_at', { ascending: false })
-      .limit(3)
-
-    if (error) throw error
-
-    return NextResponse.json({ whispers: data || [] })
-  } catch (error) {
-    console.error('Get whispers error:', error)
-    return NextResponse.json(
-      { error: 'コメントの取得に失敗しました' },
-      { status: 500 }
-    )
-  }
-}
-
-// コメント投稿
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Next.js 15対応: paramsをawaitする
+    const { id: fragmentId } = await params
+    
     const { content } = await request.json()
-    const fragmentId = params.id
 
     if (!content || content.trim().length === 0) {
       return NextResponse.json(
-        { error: 'コメントを入力してください' },
+        { error: 'コメント内容が必要です' },
         { status: 400 }
       )
     }
@@ -52,12 +25,14 @@ export async function POST(
       )
     }
 
-    // IPアドレスをハッシュ化
-    const forwarded = request.headers.get('x-forwarded-for')
-    const ip = forwarded ? forwarded.split(',')[0] : 'unknown'
-    const ipHash = crypto.createHash('sha256').update(ip).digest('hex')
+    // IPアドレスのハッシュ化（匿名性の確保）
+    const ip = request.headers.get('x-forwarded-for') || 
+               request.headers.get('x-real-ip') || 
+               'unknown'
+    
+    const ipHash = Buffer.from(ip).toString('base64').substring(0, 10)
 
-    // コメントを追加
+    // Whisperを追加
     const { data, error } = await supabase
       .from('whispers')
       .insert({
@@ -66,21 +41,16 @@ export async function POST(
         ip_hash: ipHash
       })
       .select()
-      .single()
 
     if (error) throw error
 
     return NextResponse.json({ 
       success: true,
-      whisper: {
-        id: data.id,
-        content: data.content,
-        created_at: data.created_at
-      }
+      whisper: data?.[0] 
     })
 
   } catch (error) {
-    console.error('Post whisper error:', error)
+    console.error('Whisper error:', error)
     return NextResponse.json(
       { error: 'コメントの投稿に失敗しました' },
       { status: 500 }

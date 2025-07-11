@@ -1,137 +1,319 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import FragmentCard from './FragmentCard'
 import { Fragment } from '@/types/fragment'
+import { generateUserIpHash, debugHashGeneration } from '@/lib/hashUtils'
+
+interface ExtendedFragment extends Fragment {
+  resonance_count: number
+  whispers: any[]
+  whisper_count: number
+  user_has_resonated: boolean
+}
 
 export default function GalleryView() {
-  const [fragments, setFragments] = useState<Fragment[]>([])
+  const [fragments, setFragments] = useState<ExtendedFragment[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [filterType, setFilterType] = useState<string>('all')
+  const [userIpHash, setUserIpHash] = useState<string>('')
 
-  useEffect(() => {
-    fetchFragments()
-  }, [])
+  // ✨ デザインシステム: 段階的出現遅延
+  const ANIMATION_DELAYS = {
+    header: 0,
+    subtitle: 120,
+    counter: 240,
+    cards: 360,
+    cardStagger: 120
+  }
 
-  const fetchFragments = async () => {
+  // 🎯 データ取得: 完全な関連データ + ユーザー状態
+  const fetchFragments = useCallback(async () => {
     try {
       setLoading(true)
       
-      // 公開されているFragmentのみを取得
-      const { data, error } = await supabase
+      // 🔐 統一ハッシュ生成
+      const currentUserHash = generateUserIpHash()
+      setUserIpHash(currentUserHash)
+      
+      // 🔍 デバッグ: ハッシュ生成プロセス表示
+      const debugInfo = debugHashGeneration()
+      console.log('🔐 [Step 2] Hash generation debug:', debugInfo)
+      
+      // Step 1: 基本Fragmentデータ取得
+      const { data: fragmentsData, error: fragmentsError } = await supabase
         .from('fragments')
         .select('*')
-        .eq('is_published', true)
         .order('created_at', { ascending: false })
 
-      if (error) throw error
+      if (fragmentsError) throw fragmentsError
+      if (!fragmentsData) {
+        setFragments([])
+        return
+      }
 
-      setFragments(data || [])
+      console.log(`📊 [Step 2] Processing ${fragmentsData.length} fragments with unified hash`)
+
+      // Step 2: 並行処理による関連データ取得 + ユーザー状態照合
+      const fragmentsWithCounts = await Promise.all(
+        fragmentsData.map(async (fragment) => {
+          // 共鳴データ取得（ip_hash含む）
+          const { data: resonances } = await supabase
+            .from('resonances')
+            .select('id, ip_hash')
+            .eq('fragment_id', fragment.id)
+
+          // コメント取得
+          const { data: whispers } = await supabase
+            .from('whispers')
+            .select('id, content, created_at')
+            .eq('fragment_id', fragment.id)
+            .order('created_at', { ascending: false })
+
+          // 🎯 重要: ユーザー共鳴状態の正確な判定
+          const hasUserResonated = resonances?.some(r => r.ip_hash === currentUserHash) || false
+
+          console.log(`🔍 [Step 2] Fragment ${fragment.display_number} resonance check:`, {
+            fragmentId: fragment.id,
+            userHash: currentUserHash,
+            resonanceHashes: resonances?.map(r => r.ip_hash) || [],
+            hasUserResonated,
+            totalResonances: resonances?.length || 0,
+            hashMatches: resonances?.filter(r => r.ip_hash === currentUserHash).length || 0
+          })
+
+          return {
+            ...fragment,
+            resonance_count: resonances?.length || 0,
+            whispers: whispers || [],
+            whisper_count: whispers?.length || 0,
+            user_has_resonated: hasUserResonated
+          }
+        })
+      )
+
+      console.log('📊 [Step 2] Fragments with complete data:', 
+        fragmentsWithCounts.map(f => ({
+          number: f.display_number,
+          resonances: f.resonance_count,
+          userResonated: f.user_has_resonated,
+          whispers: f.whisper_count
+        }))
+      )
+      
+      console.log('🔐 [Step 2] Final User Hash:', currentUserHash)
+
+      setFragments(fragmentsWithCounts)
     } catch (error) {
-      console.error('Error fetching fragments:', error)
+      console.error('❌ Error fetching fragments:', error)
       setError('作品の読み込みに失敗しました')
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
 
-  // タイプでフィルタリング
-  const filteredFragments = fragments.filter(fragment => {
-    if (filterType === 'all') return true
-    return fragment.type === filterType
-  })
+  // 🔄 リアルタイム更新ハンドラ
+  const handleFragmentUpdate = useCallback((fragmentId: string) => {
+    // 個別Fragment再取得（パフォーマンス最適化）
+    const updateSingleFragment = async () => {
+      try {
+        // 🔐 統一ハッシュ生成
+        const currentUserHash = generateUserIpHash()
+        
+        console.log(`🔄 [Step 2] Updating fragment ${fragmentId} with hash:`, currentUserHash)
+        
+        const { data: resonances } = await supabase
+          .from('resonances')
+          .select('id, ip_hash')
+          .eq('fragment_id', fragmentId)
 
-  // タイプ別の件数を計算
-  const typeCounts = fragments.reduce((acc, fragment) => {
-    acc[fragment.type] = (acc[fragment.type] || 0) + 1
-    return acc
-  }, {} as Record<string, number>)
+        const { data: whispers } = await supabase
+          .from('whispers')
+          .select('id, content, created_at')
+          .eq('fragment_id', fragmentId)
+          .order('created_at', { ascending: false })
 
+        const hasUserResonated = resonances?.some(r => r.ip_hash === currentUserHash) || false
+
+        // 🎯 ローカル状態更新（リアルタイム）
+        setFragments(prev => prev.map(fragment => 
+          fragment.id === fragmentId 
+            ? {
+                ...fragment,
+                resonance_count: resonances?.length || 0,
+                whispers: whispers || [],
+                whisper_count: whispers?.length || 0,
+                user_has_resonated: hasUserResonated
+              }
+            : fragment
+        ))
+
+        console.log('🔄 [Step 2] Fragment updated:', fragmentId, { 
+          resonances: resonances?.length, 
+          whispers: whispers?.length,
+          userResonated: hasUserResonated,
+          userHash: currentUserHash
+        })
+      } catch (error) {
+        console.error('❌ Error updating fragment:', error)
+      }
+    }
+
+    updateSingleFragment()
+  }, [])
+
+  useEffect(() => {
+    fetchFragments()
+  }, [fetchFragments])
+
+  // 🎨 Loading State: ミニマル瞑想的デザイン
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-pulse text-gray-400 animate-fade-in">
-          作品を読み込んでいます...
+      <div className="min-h-screen bg-[#f9f8f6] flex items-center justify-center">
+        <div className="text-center space-y-4">
+          {/* 禅的ローディング */}
+          <div className="w-12 h-12 mx-auto">
+            <div className="w-full h-full border-2 border-[#6a6a6a]/20 border-t-[#3a3a3a] rounded-full animate-spin"></div>
+          </div>
+          <p className="text-[#6a6a6a] text-sm font-light tracking-wide animate-pulse">
+            Still becoming...
+          </p>
         </div>
       </div>
     )
   }
 
+  // 🚨 Error State: 詩的エラー表現
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-red-500">{error}</div>
+      <div className="min-h-screen bg-[#f9f8f6] flex items-center justify-center">
+        <div className="text-center max-w-md px-6">
+          <div className="w-16 h-16 mx-auto mb-6 opacity-30">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" className="w-full h-full text-[#6a6a6a]">
+              <circle cx="12" cy="12" r="10"/>
+              <line x1="12" y1="8" x2="12" y2="12"/>
+              <line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+          </div>
+          <p className="text-[#6a6a6a] text-sm mb-2">{error}</p>
+          <button 
+            onClick={() => fetchFragments()}
+            className="text-xs text-[#3a3a3a] hover:text-[#1c1c1c] transition-colors duration-300 underline underline-offset-4"
+          >
+            再試行
+          </button>
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-[#f9f8f6] py-16">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* ヘッダー */}
-        <div className="text-center mb-12">
-          <h1 className="text-3xl font-light text-gray-800 mb-4 animate-fade-in-up">
-            Fragments of Structure
-          </h1>
-          <p className="text-sm text-gray-600 animate-fade-in-up animation-delay-120">
+    <div className="min-h-screen bg-[#f9f8f6]">
+      {/* 🎨 Header: タイポグラフィ階層とアニメーション */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-16 pb-8">
+        <div className="text-center space-y-6">
+          {/* メインタイトル */}
+          <div 
+            className="animate-fade-in-up"
+            style={{ animationDelay: `${ANIMATION_DELAYS.header}ms` }}
+          >
+            <h1 className="text-4xl font-light text-[#1c1c1c] tracking-wide mb-2">
+              Fragments of Structure
+            </h1>
+            <div className="w-12 h-px bg-[#3a3a3a] mx-auto opacity-30"></div>
+          </div>
+
+          {/* サブタイトル */}
+          <p 
+            className="text-sm text-[#6a6a6a] font-light tracking-wide animate-fade-in-up"
+            style={{ animationDelay: `${ANIMATION_DELAYS.subtitle}ms` }}
+          >
             構造のかけらたち
           </p>
-        </div>
 
-        {/* フィルターボタン */}
-        <div className="flex justify-center mb-8 space-x-4 animate-fade-in-up animation-delay-240">
-          <button
-            onClick={() => setFilterType('all')}
-            className={`px-4 py-2 text-sm rounded-full transition-all duration-200 transform hover:scale-105 ${
-              filterType === 'all'
-                ? 'bg-gray-800 text-white shadow-md'
-                : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
-            }`}
+          {/* 作品数カウンター */}
+          <div 
+            className="animate-fade-in-up"
+            style={{ animationDelay: `${ANIMATION_DELAYS.counter}ms` }}
           >
-            すべて ({fragments.length})
-          </button>
-          
-          {Object.entries(typeCounts).map(([type, count]) => (
-            <button
-              key={type}
-              onClick={() => setFilterType(type)}
-              className={`px-4 py-2 text-sm rounded-full transition-all duration-200 transform hover:scale-105 ${
-                filterType === type
-                  ? 'bg-gray-800 text-white shadow-md'
-                  : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
-              }`}
-            >
-              {type} ({count})
-            </button>
-          ))}
+            <p className="text-xs text-[#6a6a6a] opacity-60">
+              {fragments.length} の構造が見つかりました
+            </p>
+          </div>
         </div>
+      </div>
 
-        {/* 作品グリッド */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {filteredFragments.map((fragment, index) => (
-            <div 
-              key={fragment.id}
-              className={`animate-fade-in-up`}
-              style={{ animationDelay: `${360 + index * 120}ms` }}
-            >
-              <FragmentCard fragment={fragment} />
+      {/* 🔧 デバッグ情報: 開発環境限定 */}
+      {process.env.NODE_ENV === 'development' && (
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-8">
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-xs text-blue-800">
+            <p className="font-medium mb-2">🔧 [Step 2] Debug Information - Unified Hash System</p>
+            <p className="mb-1">User Hash: <code className="bg-blue-100 px-1 rounded">{userIpHash}</code></p>
+            <p>
+              Fragments: {fragments.map(f => 
+                `${f.display_number}: ${f.resonance_count}共鳴${f.user_has_resonated ? '(✓済)' : '(未)'}, ${f.whisper_count}コメント`
+              ).join(' | ')}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* 🎨 Gallery Grid: レスポンシブ + ステージングアニメーション */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-16">
+        {fragments.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {fragments.map((fragment, index) => (
+              <div 
+                key={fragment.id}
+                className="animate-fade-in-up"
+                style={{ 
+                  animationDelay: `${ANIMATION_DELAYS.cards + index * ANIMATION_DELAYS.cardStagger}ms` 
+                }}
+              >
+                <FragmentCard 
+                  fragment={fragment} 
+                  index={index}
+                  onUpdate={() => handleFragmentUpdate(fragment.id)}
+                />
+              </div>
+            ))}
+          </div>
+        ) : (
+          /* 🎭 Empty State: 詩的な空状態 */
+          <div className="text-center py-24 animate-fade-in-up">
+            <div className="w-24 h-24 mx-auto mb-8 opacity-20">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="0.5" className="w-full h-full text-[#6a6a6a]">
+                <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+              </svg>
             </div>
-          ))}
-        </div>
-
-        {/* 作品がない場合 */}
-        {filteredFragments.length === 0 && (
-          <div className="text-center py-20">
-            <p className="text-gray-500">
-              {filterType === 'all' 
-                ? '表示する作品がありません' 
-                : `${filterType}タイプの作品はありません`}
+            <p className="text-[#6a6a6a] text-sm font-light mb-2">
+              まだ構造のかけらはありません
+            </p>
+            <p className="text-xs text-[#6a6a6a]/60">
+              最初の Fragment を投稿してみましょう
             </p>
           </div>
         )}
       </div>
+
+      {/* 🎨 カスタムアニメーション定義 */}
+      <style jsx global>{`
+        @keyframes fade-in-up {
+          from { 
+            opacity: 0; 
+            transform: translateY(24px); 
+          }
+          to { 
+            opacity: 1; 
+            transform: translateY(0); 
+          }
+        }
+        
+        .animate-fade-in-up {
+          animation: fade-in-up 0.8s ease-out both;
+        }
+      `}</style>
     </div>
   )
 }

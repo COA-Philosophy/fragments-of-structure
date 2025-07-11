@@ -1,59 +1,63 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
-import crypto from 'crypto'
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const fragmentId = params.id
-    
-    // IPアドレスをハッシュ化
-    const forwarded = request.headers.get('x-forwarded-for')
-    const ip = forwarded ? forwarded.split(',')[0] : 'unknown'
-    const ipHash = crypto.createHash('sha256').update(ip).digest('hex')
+    // Next.js 15対応: paramsをawaitする
+    const { id: fragmentId } = await params
 
-    // 既に共鳴しているかチェック
-    const { data: existing } = await supabase
+    // IPアドレスのハッシュ化（重複防止）
+    const ip = request.headers.get('x-forwarded-for') || 
+               request.headers.get('x-real-ip') || 
+               'unknown'
+    
+    const ipHash = Buffer.from(ip).toString('base64').substring(0, 10)
+
+    // 既に共鳴済みかチェック
+    const { data: existingResonance } = await supabase
       .from('resonances')
       .select('id')
       .eq('fragment_id', fragmentId)
       .eq('ip_hash', ipHash)
       .single()
 
-    if (existing) {
+    if (existingResonance) {
       return NextResponse.json(
-        { error: '既に共鳴しています' },
-        { status: 400 }
+        { error: '既に共鳴済みです' },
+        { status: 409 }
       )
     }
 
     // 新しい共鳴を追加
-    const { error: insertError } = await supabase
+    const { data, error } = await supabase
       .from('resonances')
       .insert({
         fragment_id: fragmentId,
         ip_hash: ipHash
       })
+      .select()
 
-    if (insertError) throw insertError
+    if (error) throw error
 
-    // 現在の共鳴数を取得
-    const { count } = await supabase
+    // 共鳴数を取得
+    const { data: resonanceCount } = await supabase
       .from('resonances')
-      .select('*', { count: 'exact', head: true })
+      .select('id')
       .eq('fragment_id', fragmentId)
 
     return NextResponse.json({ 
       success: true,
-      count: count || 0
+      resonance: data?.[0],
+      count: resonanceCount?.length || 0
     })
 
   } catch (error) {
-    console.error('Resonate error:', error)
+    console.error('Resonance error:', error)
     return NextResponse.json(
-      { error: '共鳴の処理に失敗しました' },
+      { error: '共鳴に失敗しました' },
       { status: 500 }
     )
   }

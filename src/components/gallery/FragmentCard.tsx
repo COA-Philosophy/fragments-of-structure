@@ -9,15 +9,30 @@ import ResonanceButton from './ResonanceButton'
 import Toast from './Toast'
 import { Fragment, Whisper } from '@/types/fragment'
 
-interface FragmentCardProps {
-  fragment: Fragment & {
-    resonance_count?: number
-    whispers?: Whisper[]
-  }
-  index?: number
+interface ExtendedFragment extends Fragment {
+  resonance_count: number
+  whispers: Whisper[]
+  whisper_count: number
+  user_has_resonated: boolean
 }
 
-export default function FragmentCard({ fragment, index = 0 }: FragmentCardProps) {
+interface FragmentCardProps {
+  fragment: ExtendedFragment
+  index?: number
+  onUpdate?: () => void // 🔄 リアルタイム更新コールバック
+}
+
+export default function FragmentCard({ 
+  fragment, 
+  index = 0,
+  onUpdate 
+}: FragmentCardProps) {
+  // 🎯 State Management: データベース同期状態
+  const [hasResonated, setHasResonated] = useState(fragment.user_has_resonated)
+  const [resonanceCount, setResonanceCount] = useState(fragment.resonance_count)
+  const [whisperCount, setWhisperCount] = useState(fragment.whisper_count)
+  
+  // 🎨 UI State: インタラクション状態
   const [menuOpen, setMenuOpen] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [deletePassword, setDeletePassword] = useState('')
@@ -25,38 +40,83 @@ export default function FragmentCard({ fragment, index = 0 }: FragmentCardProps)
   const [showFullscreen, setShowFullscreen] = useState(false)
   const [showToast, setShowToast] = useState(false)
   const [toastMessage, setToastMessage] = useState('')
+  
+  // 🖼️ Image State: サムネイル表示制御
   const [imageLoaded, setImageLoaded] = useState(false)
   const [imageError, setImageError] = useState(false)
-  const [hasResonated, setHasResonated] = useState(false)
-  const [whisperCount, setWhisperCount] = useState(fragment.whispers?.length || 0)
 
   const menuRef = useRef<HTMLDivElement>(null)
 
-  // Fragment番号のフォーマット（3桁ゼロパディング）
+  // 🎨 デザインシステム: アニメーション設定
+  const ANIMATIONS = {
+    duration: 0.6,
+    ease: [0.19, 1, 0.22, 1] as [number, number, number, number],
+    stagger: 0.08
+  }
+
+  // 📊 Fragment番号のフォーマット（3桁ゼロパディング）
   const fragmentNumber = `Fragment ${String(fragment.display_number || index + 1).padStart(3, '0')}`
 
-  // 画像読み込み完了ハンドラ
-  const handleImageLoad = useCallback(() => {
-    setImageLoaded(true)
-  }, [])
+  // 🔄 Props変化時の状態同期（重要：データベース ↔ UI）
+  useEffect(() => {
+    console.log('🔄 Syncing fragment state:', {
+      id: fragment.id,
+      user_has_resonated: fragment.user_has_resonated,
+      resonance_count: fragment.resonance_count,
+      whisper_count: fragment.whisper_count
+    })
 
-  // 画像エラーハンドラ
+    setHasResonated(fragment.user_has_resonated)
+    setResonanceCount(fragment.resonance_count)
+    setWhisperCount(fragment.whisper_count)
+  }, [
+    fragment.user_has_resonated, 
+    fragment.resonance_count, 
+    fragment.whisper_count,
+    fragment.id
+  ])
+
+  // 🎯 共鳴ハンドラ: 楽観的UI更新 + データ同期
+  const handleResonate = useCallback(async (success: boolean) => {
+    if (success && !hasResonated) {
+      // 👍 楽観的UI更新（即座反映）
+      setHasResonated(true)
+      setResonanceCount(prev => prev + 1)
+      
+      // 🎊 成功フィードバック
+      setToastMessage('共鳴が生まれました')
+      setShowToast(true)
+      
+      // 🔄 親コンポーネント更新（1秒後）
+      setTimeout(() => {
+        if (onUpdate) onUpdate()
+      }, 1000)
+    }
+  }, [hasResonated, onUpdate])
+
+  // 💬 Whisperハンドラ: リアルタイム更新
+  const handleWhisper = useCallback((content: string) => {
+    // 👍 楽観的UI更新
+    setWhisperCount(prev => prev + 1)
+    
+    // 🎊 成功フィードバック
+    setToastMessage('言葉が添えられました')
+    setShowToast(true)
+    
+    // 🔄 親コンポーネント更新（1秒後）
+    setTimeout(() => {
+      if (onUpdate) onUpdate()
+    }, 1000)
+  }, [onUpdate])
+
+  // 🖼️ 画像ハンドラ
+  const handleImageLoad = useCallback(() => setImageLoaded(true), [])
   const handleImageError = useCallback(() => {
     setImageError(true)
-    console.warn(`Failed to load thumbnail for ${fragmentNumber}`)
+    console.warn(`⚠️ Failed to load thumbnail for ${fragmentNumber}`)
   }, [fragmentNumber])
 
-  // 共鳴時のハンドラ
-  const handleResonate = useCallback(() => {
-    setHasResonated(true)
-  }, [])
-
-  // Whisper追加時のハンドラ
-  const handleWhisper = useCallback((content: string) => {
-    setWhisperCount(prev => prev + 1)
-  }, [])
-
-  // クリックアウトサイドで閉じる
+  // 🖱️ メニュー制御
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
@@ -68,23 +128,18 @@ export default function FragmentCard({ fragment, index = 0 }: FragmentCardProps)
       document.addEventListener('mousedown', handleClickOutside)
     }
 
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside)
-    }
+    return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [menuOpen])
 
-  // 削除処理（POSTメソッドに変更）
+  // 🗑️ 削除処理
   const handleDelete = async () => {
     if (!deletePassword) return
 
     setDeleting(true)
     try {
-      // DELETEからPOSTに変更（URLパスも調整）
       const response = await fetch(`/api/fragments/${fragment.id}/delete`, {
-        method: 'POST', // 変更箇所
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ password: deletePassword }),
       })
 
@@ -105,156 +160,199 @@ export default function FragmentCard({ fragment, index = 0 }: FragmentCardProps)
     }
   }
 
-  // コードをコピー
-  const copyCode = () => {
+  // 📋 コピー機能
+  const copyCode = useCallback(() => {
     navigator.clipboard.writeText(fragment.code)
     setToastMessage('コードをコピーしました')
     setShowToast(true)
     setMenuOpen(false)
-  }
+  }, [fragment.code])
 
-  // プロンプトをコピー
-  const copyPrompt = () => {
+  const copyPrompt = useCallback(() => {
     if (fragment.prompt) {
       navigator.clipboard.writeText(fragment.prompt)
       setToastMessage('プロンプトをコピーしました')
       setShowToast(true)
     }
     setMenuOpen(false)
-  }
+  }, [fragment.prompt])
 
   return (
     <>
+      {/* 🎨 Main Card: レイヤード設計 + ホバーエフェクト */}
       <motion.div
-        initial={{ opacity: 0, y: 20 }}
+        initial={{ opacity: 0, y: 24 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ 
-          duration: 0.6, 
-          delay: index * 0.08,
-          ease: [0.19, 1, 0.22, 1]
+          ...ANIMATIONS,
+          delay: index * ANIMATIONS.stagger
         }}
-        className="group relative bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-lg transition-all duration-300"
+        className="group relative bg-white/80 backdrop-blur-sm border border-[#3a3a3a]/10 rounded-lg overflow-hidden
+                   hover:shadow-xl hover:shadow-[#3a3a3a]/5 hover:border-[#3a3a3a]/20 transition-all duration-500
+                   hover:-translate-y-1"
       >
-        {/* プレビュー領域 */}
+        {/* 🖼️ Preview Area: サムネイル + Canvas */}
         <div 
-          className="relative w-full h-64 bg-gray-50 cursor-pointer overflow-hidden"
+          className="relative w-full h-64 bg-[#f9f8f6] cursor-pointer overflow-hidden group/preview"
           onClick={() => setShowFullscreen(true)}
         >
-          {/* サムネイル優先表示 */}
+          {/* サムネイル優先表示システム */}
           {fragment.thumbnail_url && !imageError ? (
             <>
-              {/* ローディングプレースホルダー */}
+              {/* ローディング状態 */}
               <AnimatePresence>
                 {!imageLoaded && (
                   <motion.div
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     exit={{ opacity: 0 }}
-                    className="absolute inset-0 flex items-center justify-center bg-gray-50"
+                    className="absolute inset-0 flex items-center justify-center bg-[#f9f8f6]"
                   >
-                    <motion.div
-                      animate={{ rotate: 360 }}
-                      transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-                      className="w-8 h-8 border-2 border-gray-300 border-t-gray-600 rounded-full"
-                    />
+                    <div className="relative">
+                      <div className="w-8 h-8 border-2 border-[#6a6a6a]/20 border-t-[#3a3a3a] rounded-full animate-spin"></div>
+                      <div className="absolute inset-0 border-2 border-transparent border-b-[#d4af37]/30 rounded-full animate-spin"
+                           style={{ animationDirection: 'reverse', animationDuration: '3s' }}></div>
+                    </div>
                   </motion.div>
                 )}
               </AnimatePresence>
 
               {/* サムネイル画像 */}
               <motion.img
-                src={`${fragment.thumbnail_url}?f_auto,q_auto`}
+                src={`${fragment.thumbnail_url}?f_auto,q_auto,w_800`}
                 alt={fragment.title}
                 onLoad={handleImageLoad}
                 onError={handleImageError}
-                className="w-full h-full object-cover"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: imageLoaded ? 1 : 0 }}
-                transition={{ duration: 0.6 }}
+                className="w-full h-full object-cover transition-transform duration-700 group-hover/preview:scale-105"
+                initial={{ opacity: 0, scale: 1.1 }}
+                animate={{ 
+                  opacity: imageLoaded ? 1 : 0,
+                  scale: imageLoaded ? 1 : 1.1
+                }}
+                transition={{ duration: 0.8, ease: "easeOut" }}
               />
             </>
           ) : (
             /* Canvas フォールバック */
-            <CodePreview 
-              code={fragment.code} 
-              fragmentId={fragment.id}
-              className="w-full h-full"
-            />
+            <div className="relative w-full h-full">
+              <CodePreview 
+                code={fragment.code} 
+                fragmentId={fragment.id}
+                className="w-full h-full transition-transform duration-700 group-hover/preview:scale-105"
+              />
+              {/* フォールバック時の微細なオーバーレイ */}
+              <div className="absolute inset-0 bg-gradient-to-t from-black/5 to-transparent pointer-events-none"></div>
+            </div>
           )}
 
-          {/* Fragment番号 */}
-          <div className="absolute top-2 left-2 bg-white/90 backdrop-blur-sm px-2 py-1 rounded text-xs text-gray-600">
-            {fragmentNumber}
+          {/* Fragment番号 - 洗練されたタイポグラフィ */}
+          <div className="absolute top-3 left-3 bg-white/90 backdrop-blur-md px-3 py-1.5 rounded-md
+                         border border-white/50 shadow-sm">
+            <span className="text-xs font-light text-[#6a6a6a] tracking-wide">
+              {fragmentNumber}
+            </span>
+          </div>
+
+          {/* ホバー時のプレビュー指示 */}
+          <div className="absolute inset-0 bg-black/0 group-hover/preview:bg-black/10 transition-colors duration-300
+                         flex items-center justify-center opacity-0 group-hover/preview:opacity-100">
+            <div className="bg-white/90 backdrop-blur-md px-4 py-2 rounded-full border border-white/50">
+              <span className="text-xs text-[#3a3a3a] font-light">詳細を見る</span>
+            </div>
           </div>
         </div>
 
-        {/* カード情報 */}
-        <div className="p-4">
-          <div className="flex items-start justify-between mb-2">
-            <h3 className="text-lg font-medium text-gray-900 flex-1 mr-2">{fragment.title}</h3>
+        {/* 📝 Card Content: 情報とアクション */}
+        <div className="p-5 space-y-4">
+          {/* タイトル + メニュー */}
+          <div className="flex items-start justify-between gap-3">
+            <h3 className="text-lg font-light text-[#1c1c1c] leading-snug flex-1 min-w-0">
+              {fragment.title}
+            </h3>
             
-            {/* 3点メニュー */}
-            <div ref={menuRef} className="relative">
+            {/* 3点メニュー - ミニマル設計 */}
+            <div ref={menuRef} className="relative flex-shrink-0">
               <button
                 onClick={() => setMenuOpen(!menuOpen)}
-                className="p-1 hover:bg-gray-100 rounded transition-colors"
+                className="p-2 -m-2 hover:bg-[#3a3a3a]/5 rounded-lg transition-colors duration-200 group/menu"
+                aria-label="メニューを開く"
               >
-                <svg className="w-5 h-5 text-gray-600" fill="currentColor" viewBox="0 0 20 20">
+                <svg className="w-4 h-4 text-[#6a6a6a] group-hover/menu:text-[#3a3a3a] transition-colors" 
+                     fill="currentColor" viewBox="0 0 20 20">
                   <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
                 </svg>
               </button>
 
-              {menuOpen && (
-                <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-10 border border-gray-200">
-                  <button
-                    onClick={() => {
-                      setShowDeleteModal(true)
-                      setMenuOpen(false)
-                    }}
-                    className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+              {/* ドロップダウンメニュー */}
+              <AnimatePresence>
+                {menuOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.95, y: -8 }}
+                    animate={{ opacity: 1, scale: 1, y: 0 }}
+                    exit={{ opacity: 0, scale: 0.95, y: -8 }}
+                    transition={{ duration: 0.15 }}
+                    className="absolute right-0 top-full mt-2 w-48 bg-white/95 backdrop-blur-md rounded-lg 
+                              shadow-lg border border-[#3a3a3a]/10 py-1 z-20"
                   >
-                    削除
-                  </button>
-                  <button
-                    onClick={copyCode}
-                    className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                  >
-                    コードをコピー
-                  </button>
-                  {fragment.prompt && (
                     <button
-                      onClick={copyPrompt}
-                      className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                      onClick={() => {
+                        setShowDeleteModal(true)
+                        setMenuOpen(false)
+                      }}
+                      className="w-full text-left px-4 py-2.5 text-sm text-[#6a6a6a] hover:text-[#1c1c1c] 
+                                hover:bg-[#3a3a3a]/5 transition-colors duration-150"
                     >
-                      プロンプトをコピー
+                      削除
                     </button>
-                  )}
-                </div>
-              )}
+                    <button
+                      onClick={copyCode}
+                      className="w-full text-left px-4 py-2.5 text-sm text-[#6a6a6a] hover:text-[#1c1c1c] 
+                                hover:bg-[#3a3a3a]/5 transition-colors duration-150"
+                    >
+                      コードをコピー
+                    </button>
+                    {fragment.prompt && (
+                      <button
+                        onClick={copyPrompt}
+                        className="w-full text-left px-4 py-2.5 text-sm text-[#6a6a6a] hover:text-[#1c1c1c] 
+                                  hover:bg-[#3a3a3a]/5 transition-colors duration-150"
+                      >
+                        プロンプトをコピー
+                      </button>
+                    )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
           </div>
 
           {/* 説明文 */}
           {fragment.description && (
-            <p className="text-sm text-gray-600 mb-3 line-clamp-2">
+            <p className="text-sm text-[#6a6a6a] leading-relaxed line-clamp-2">
               {fragment.description}
             </p>
           )}
 
           {/* プロンプト */}
           {fragment.prompt && (
-            <div className="mb-3 p-2 bg-gray-50 rounded text-xs text-gray-600 italic">
-              <span className="opacity-60">Prompt:</span> {fragment.prompt.slice(0, 100)}
-              {fragment.prompt.length > 100 && '...'}
+            <div className="p-3 bg-[#f9f8f6] rounded-lg border border-[#3a3a3a]/5">
+              <div className="flex items-start gap-2">
+                <span className="text-xs text-[#6a6a6a]/60 font-light shrink-0 mt-0.5">Prompt:</span>
+                <p className="text-xs text-[#6a6a6a] italic leading-relaxed">
+                  {fragment.prompt.slice(0, 120)}
+                  {fragment.prompt.length > 120 && '...'}
+                </p>
+              </div>
             </div>
           )}
 
-          {/* アクションボタン */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
+          {/* アクションエリア */}
+          <div className="flex items-center justify-between pt-2">
+            <div className="flex items-center gap-4">
               <ResonanceButton 
                 fragmentId={fragment.id}
                 hasResonated={hasResonated}
+                resonanceCount={resonanceCount}
                 onResonate={handleResonate}
               />
               <WhisperButton
@@ -265,58 +363,79 @@ export default function FragmentCard({ fragment, index = 0 }: FragmentCardProps)
             </div>
 
             {/* 作成日時 */}
-            <time className="text-xs text-gray-400">
-              {new Date(fragment.created_at).toLocaleDateString('ja-JP')}
+            <time className="text-xs text-[#6a6a6a]/60 font-light">
+              {new Date(fragment.created_at).toLocaleDateString('ja-JP', {
+                year: 'numeric',
+                month: 'numeric',
+                day: 'numeric'
+              })}
             </time>
           </div>
         </div>
       </motion.div>
 
-      {/* フルスクリーンモーダル */}
+      {/* 🎭 Modals */}
       <FullscreenModal
         fragment={fragment}
         isOpen={showFullscreen}
         onClose={() => setShowFullscreen(false)}
       />
 
-      {/* 削除確認モーダル */}
-      {showDeleteModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg p-6 max-w-sm w-full">
-            <h3 className="text-lg font-medium mb-4">Fragmentを削除</h3>
-            <p className="text-sm text-gray-600 mb-4">
-              削除するにはパスワードを入力してください
-            </p>
-            <input
-              type="password"
-              value={deletePassword}
-              onChange={(e) => setDeletePassword(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md mb-4"
-              placeholder="パスワード"
-            />
-            <div className="flex justify-end gap-2">
-              <button
-                onClick={() => {
-                  setShowDeleteModal(false)
-                  setDeletePassword('')
-                }}
-                className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800"
-              >
-                キャンセル
-              </button>
-              <button
-                onClick={handleDelete}
-                disabled={!deletePassword || deleting}
-                className="px-4 py-2 bg-red-600 text-white text-sm rounded-md hover:bg-red-700 disabled:opacity-50"
-              >
-                {deleting ? '削除中...' : '削除'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* 🗑️ 削除確認モーダル */}
+      <AnimatePresence>
+        {showDeleteModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 8 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 8 }}
+              className="bg-white/95 backdrop-blur-md rounded-lg shadow-xl border border-[#3a3a3a]/10 
+                        p-6 max-w-sm w-full"
+            >
+              <h3 className="text-lg font-light text-[#1c1c1c] mb-3">Fragmentを削除</h3>
+              <p className="text-sm text-[#6a6a6a] mb-4 leading-relaxed">
+                削除するにはパスワードを入力してください
+              </p>
+              <input
+                type="password"
+                value={deletePassword}
+                onChange={(e) => setDeletePassword(e.target.value)}
+                className="w-full px-4 py-3 border border-[#3a3a3a]/20 rounded-lg mb-4 
+                          focus:outline-none focus:border-[#3a3a3a]/40 transition-colors duration-200
+                          bg-white/50 text-[#1c1c1c] placeholder-[#6a6a6a]/60"
+                placeholder="パスワード"
+                autoFocus
+              />
+              <div className="flex justify-end gap-3">
+                <button
+                  onClick={() => {
+                    setShowDeleteModal(false)
+                    setDeletePassword('')
+                  }}
+                  className="px-4 py-2 text-sm text-[#6a6a6a] hover:text-[#1c1c1c] transition-colors duration-200"
+                >
+                  キャンセル
+                </button>
+                <button
+                  onClick={handleDelete}
+                  disabled={!deletePassword || deleting}
+                  className="px-5 py-2 bg-red-500 text-white text-sm rounded-lg hover:bg-red-600 
+                            disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+                >
+                  {deleting ? '削除中...' : '削除'}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      {/* トースト */}
+      {/* 🎊 トースト通知 */}
       <Toast
         message={toastMessage}
         isVisible={showToast}

@@ -4,11 +4,13 @@ import crypto from 'crypto'
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    // Next.js 15対応: paramsをawaitする
+    const { id: fragmentId } = await params
+    
     const { password } = await request.json()
-    const fragmentId = params.id
 
     if (!password) {
       return NextResponse.json(
