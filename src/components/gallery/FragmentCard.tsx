@@ -9,6 +9,11 @@ import ResonanceButton from './ResonanceButton'
 import Toast from './Toast'
 import { Fragment, Whisper } from '@/types/fragment'
 
+// 🆕 新しいデザインシステムコンポーネントをインポート
+import { FragmentTitle, FragmentDescription } from '../design-system/BilingualText/BilingualText'
+import { FragmentCategoryBadge } from '../design-system/CategoryBadge/CategoryBadge'
+import { FragmentCreator } from '../design-system/CreatorNickname/CreatorNickname'
+
 interface ExtendedFragment extends Fragment {
   resonance_count: number
   whispers: Whisper[]
@@ -220,7 +225,7 @@ export default function FragmentCard({
               {/* サムネイル画像 */}
               <motion.img
                 src={`${fragment.thumbnail_url}?f_auto,q_auto,w_800`}
-                alt={fragment.title}
+                alt={fragment.title_primary || fragment.title}
                 onLoad={handleImageLoad}
                 onError={handleImageError}
                 className="w-full h-full object-cover transition-transform duration-700 group-hover/preview:scale-105"
@@ -253,6 +258,17 @@ export default function FragmentCard({
             </span>
           </div>
 
+          {/* 🆕 カテゴリバッジ - 右上に表示 */}
+          {fragment.category && (
+            <div className="absolute top-3 right-3">
+              <FragmentCategoryBadge 
+                fragment={fragment} 
+                size="xs"
+                className="bg-white/90 backdrop-blur-md shadow-sm"
+              />
+            </div>
+          )}
+
           {/* ホバー時のプレビュー指示 */}
           <div className="absolute inset-0 bg-black/0 group-hover/preview:bg-black/10 transition-colors duration-300
                          flex items-center justify-center opacity-0 group-hover/preview:opacity-100">
@@ -266,9 +282,11 @@ export default function FragmentCard({
         <div className="p-5 space-y-4">
           {/* タイトル + メニュー */}
           <div className="flex items-start justify-between gap-3">
-            <h3 className="text-lg font-light text-[#1c1c1c] leading-snug flex-1 min-w-0">
-              {fragment.title}
-            </h3>
+            {/* 🆕 バイリンガルタイトル表示 */}
+            <FragmentTitle 
+              fragment={fragment} 
+              className="flex-1 min-w-0"
+            />
             
             {/* 3点メニュー - ミニマル設計 */}
             <div ref={menuRef} className="relative flex-shrink-0">
@@ -326,12 +344,11 @@ export default function FragmentCard({
             </div>
           </div>
 
-          {/* 説明文 */}
-          {fragment.description && (
-            <p className="text-sm text-[#6a6a6a] leading-relaxed line-clamp-2">
-              {fragment.description}
-            </p>
-          )}
+          {/* 🆕 バイリンガル説明文 */}
+          <FragmentDescription 
+            fragment={fragment}
+            maxLength={120}
+          />
 
           {/* プロンプト */}
           {fragment.prompt && (
@@ -362,14 +379,30 @@ export default function FragmentCard({
               />
             </div>
 
-            {/* 作成日時 */}
-            <time className="text-xs text-[#6a6a6a]/60 font-light">
-              {new Date(fragment.created_at).toLocaleDateString('ja-JP', {
-                year: 'numeric',
-                month: 'numeric',
-                day: 'numeric'
-              })}
-            </time>
+            {/* 🆕 創作者 + 作成日時エリア */}
+            <div className="flex items-center gap-3 text-xs text-[#6a6a6a]/60">
+              {/* 創作者ニックネーム */}
+              {(fragment.creator_nickname || fragment.creator_hash) && (
+                <FragmentCreator 
+                  fragment={fragment}
+                  size="xs"
+                />
+              )}
+              
+              {/* 区切り */}
+              {(fragment.creator_nickname || fragment.creator_hash) && (
+                <span>·</span>
+              )}
+              
+              {/* 作成日時 */}
+              <time className="font-light">
+                {new Date(fragment.created_at).toLocaleDateString('ja-JP', {
+                  year: 'numeric',
+                  month: 'numeric',
+                  day: 'numeric'
+                })}
+              </time>
+            </div>
           </div>
         </div>
       </motion.div>
