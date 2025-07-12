@@ -24,6 +24,12 @@ export default function GalleryView() {
   const [isFullscreenOpen, setIsFullscreenOpen] = useState(false)
   const [currentFragmentIndex, setCurrentFragmentIndex] = useState<number>(0)
 
+  // 🔍 検索・フィルター機能
+  const [searchQuery, setSearchQuery] = useState('')
+  const [selectedTechnologies, setSelectedTechnologies] = useState<string[]>([])
+  const [filteredFragments, setFilteredFragments] = useState<ExtendedFragment[]>([])
+  const [availableTechnologies, setAvailableTechnologies] = useState<string[]>([])
+
   // ✨ デザインシステム: 段階的出現遅延
   const ANIMATION_DELAYS = {
     header: 0,
@@ -32,6 +38,21 @@ export default function GalleryView() {
     cards: 360,
     cardStagger: 120
   }
+
+  // 🏷️ 技術タグ選択/解除
+  const toggleTechnology = useCallback((tech: string) => {
+    setSelectedTechnologies(prev => 
+      prev.includes(tech) 
+        ? prev.filter(t => t !== tech)
+        : [...prev, tech]
+    )
+  }, [])
+
+  // 🔄 フィルタークリア
+  const clearFilters = useCallback(() => {
+    setSearchQuery('')
+    setSelectedTechnologies([])
+  }, [])
 
   // 🎭 FullscreenModal制御関数
   const openFullscreen = useCallback((fragmentIndex: number) => {
@@ -44,10 +65,10 @@ export default function GalleryView() {
   }, [])
 
   const goToNext = useCallback(() => {
-    if (currentFragmentIndex < fragments.length - 1) {
+    if (currentFragmentIndex < filteredFragments.length - 1) {
       setCurrentFragmentIndex(prev => prev + 1)
     }
-  }, [currentFragmentIndex, fragments.length])
+  }, [currentFragmentIndex, filteredFragments.length])
 
   const goToPrevious = useCallback(() => {
     if (currentFragmentIndex > 0) {
@@ -56,9 +77,92 @@ export default function GalleryView() {
   }, [currentFragmentIndex])
 
   // 🎯 現在のFragment取得
-  const currentFragment = fragments[currentFragmentIndex]
-  const hasNext = currentFragmentIndex < fragments.length - 1
+  const currentFragment = filteredFragments[currentFragmentIndex]
+  const hasNext = currentFragmentIndex < filteredFragments.length - 1
   const hasPrevious = currentFragmentIndex > 0
+
+  // 🔍 技術検出関数（FragmentCardと同じロジック）
+  const detectTechnologies = useCallback((code: string): string[] => {
+    const codeUpper = code.toUpperCase()
+    const technologies: string[] = []
+
+    if (codeUpper.includes('CANVAS') || codeUpper.includes('GETCONTEXT') || codeUpper.includes('2D')) {
+      technologies.push('CANVAS')
+    }
+    if (codeUpper.includes('THREE') || codeUpper.includes('WEBGL') || codeUpper.includes('GL_')) {
+      technologies.push('THREE')
+    }
+    if (codeUpper.includes('ADDEVENTLISTENER') || codeUpper.includes('ONCLICK') || codeUpper.includes('MOUSEMOVE')) {
+      technologies.push('INTERACTIVE')
+    }
+    if (codeUpper.includes('GETELEMENTBYID') || codeUpper.includes('QUERYSELECTOR')) {
+      technologies.push('HTML5')
+    }
+    if (codeUpper.includes('@KEYFRAMES') || codeUpper.includes('ANIMATION:')) {
+      technologies.push('CSS')
+    }
+    if (codeUpper.includes('P5') || codeUpper.includes('SETUP()') || codeUpper.includes('DRAW()')) {
+      technologies.push('P5.JS')
+    }
+    if (codeUpper.includes('L-SYSTEM') || codeUpper.includes('LINDENMAYER')) {
+      technologies.push('L-SYSTEM')
+    }
+    if (codeUpper.includes('<SVG') || codeUpper.includes('CREATEELEMENT(\'SVG\'')) {
+      technologies.push('SVG')
+    }
+
+    return technologies.length > 0 ? technologies : ['CANVAS']
+  }, [])
+
+  // 🔍 フィルター関数
+  const filterFragments = useCallback(() => {
+    let filtered = [...fragments]
+
+    // 検索クエリでフィルター
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase()
+      filtered = filtered.filter(fragment => {
+        const titleMatch = (fragment.title_primary || fragment.title || '').toLowerCase().includes(query) ||
+                          (fragment.title_secondary || '').toLowerCase().includes(query)
+        const descMatch = (fragment.description_primary || fragment.description || '').toLowerCase().includes(query) ||
+                         (fragment.description_secondary || '').toLowerCase().includes(query)
+        const promptMatch = (fragment.prompt || '').toLowerCase().includes(query)
+        
+        return titleMatch || descMatch || promptMatch
+      })
+    }
+
+    // 技術タグでフィルター
+    if (selectedTechnologies.length > 0) {
+      filtered = filtered.filter(fragment => {
+        const fragmentTechs = detectTechnologies(fragment.code)
+        return selectedTechnologies.every(tech => fragmentTechs.includes(tech))
+      })
+    }
+
+    setFilteredFragments(filtered)
+    setCurrentFragmentIndex(0) // フィルター時はインデックスリセット
+  }, [fragments, searchQuery, selectedTechnologies, detectTechnologies])
+
+  // 🏷️ 利用可能な技術タグ抽出
+  const extractAvailableTechnologies = useCallback(() => {
+    const techSet = new Set<string>()
+    fragments.forEach(fragment => {
+      const techs = detectTechnologies(fragment.code)
+      techs.forEach(tech => techSet.add(tech))
+    })
+    setAvailableTechnologies(Array.from(techSet).sort())
+  }, [fragments, detectTechnologies])
+
+  // 🔄 フィルター実行
+  useEffect(() => {
+    filterFragments()
+  }, [filterFragments])
+
+  // 🔄 技術タグ抽出実行
+  useEffect(() => {
+    extractAvailableTechnologies()
+  }, [extractAvailableTechnologies])
 
   // 🎯 データ取得: 完全な関連データ + ユーザー状態
   const fetchFragments = useCallback(async () => {
@@ -82,6 +186,7 @@ export default function GalleryView() {
       if (fragmentsError) throw fragmentsError
       if (!fragmentsData) {
         setFragments([])
+        setFilteredFragments([])
         return
       }
 
@@ -137,6 +242,7 @@ export default function GalleryView() {
       console.log('🔐 [Step 2] Final User Hash:', currentUserHash)
 
       setFragments(fragmentsWithCounts)
+      setFilteredFragments(fragmentsWithCounts) // 初期状態ではフィルターなし
     } catch (error) {
       console.error('❌ Error fetching fragments:', error)
       setError('作品の読み込みに失敗しました')
@@ -264,14 +370,64 @@ export default function GalleryView() {
             構造のかけらたち
           </p>
 
-          {/* 作品数カウンター */}
+          {/* 🔍 検索・フィルターシステム */}
           <div 
-            className="animate-fade-in-up"
+            className="animate-fade-in-up space-y-4"
             style={{ animationDelay: `${ANIMATION_DELAYS.counter}ms` }}
           >
-            <p className="text-xs text-[#6a6a6a] opacity-60">
-              {fragments.length} の構造が見つかりました
-            </p>
+            {/* 検索バー */}
+            <div className="max-w-md mx-auto">
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                  <svg className="h-4 w-4 text-[#6a6a6a]/60" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                </div>
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-12 pr-4 py-3 bg-white/80 backdrop-blur-sm border border-[#3a3a3a]/10 rounded-full focus:outline-none focus:border-[#3a3a3a]/30 focus:bg-white transition-all duration-300 text-[#1c1c1c] placeholder-[#6a6a6a]/60 text-sm font-light"
+                  placeholder="作品を検索..."
+                />
+              </div>
+            </div>
+
+            {/* 技術タグフィルター */}
+            {availableTechnologies.length > 0 && (
+              <div className="flex flex-wrap justify-center gap-2 max-w-4xl mx-auto">
+                {availableTechnologies.map((tech) => (
+                  <button
+                    key={tech}
+                    onClick={() => toggleTechnology(tech)}
+                    className={`inline-flex items-center px-3 py-1.5 text-xs font-medium tracking-wide rounded-full transition-all duration-200 border ${selectedTechnologies.includes(tech) ? 'bg-[#3a3a3a] text-white border-[#3a3a3a] shadow-sm' : 'bg-slate-50 text-slate-500 border-slate-200/50 hover:border-slate-300 hover:bg-slate-100'}`}
+                  >
+                    {tech}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* フィルター状態表示 */}
+            <div className="flex items-center justify-center gap-4 text-xs text-[#6a6a6a]/60">
+              <span>
+                {filteredFragments.length} の構造が見つかりました
+                {searchQuery || selectedTechnologies.length > 0 ? (
+                  <span className="ml-2">
+                    ({fragments.length} 件中)
+                  </span>
+                ) : null}
+              </span>
+              
+              {(searchQuery || selectedTechnologies.length > 0) && (
+                <button
+                  onClick={clearFilters}
+                  className="text-[#3a3a3a] hover:text-[#1c1c1c] transition-colors duration-200 underline underline-offset-2"
+                >
+                  フィルタークリア
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -282,8 +438,12 @@ export default function GalleryView() {
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-xs text-blue-800">
             <p className="font-medium mb-2">🔧 [Step 2] Debug Information - Unified Hash System</p>
             <p className="mb-1">User Hash: <code className="bg-blue-100 px-1 rounded">{userIpHash}</code></p>
+            <p className="mb-1">
+              Search: <code className="bg-blue-100 px-1 rounded">"{searchQuery}"</code> | 
+              Tech Filters: <code className="bg-blue-100 px-1 rounded">[{selectedTechnologies.join(', ')}]</code>
+            </p>
             <p>
-              Fragments: {fragments.map(f => 
+              Fragments: {filteredFragments.map(f => 
                 `${f.display_number}: ${f.resonance_count}共鳴${f.user_has_resonated ? '(✓済)' : '(未)'}, ${f.whisper_count}コメント`
               ).join(' | ')}
             </p>
@@ -293,9 +453,9 @@ export default function GalleryView() {
 
       {/* 🎨 Gallery Grid: レスポンシブ + ステージングアニメーション */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-16">
-        {fragments.length > 0 ? (
+        {filteredFragments.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {fragments.map((fragment, index) => (
+            {filteredFragments.map((fragment, index) => (
               <div 
                 key={fragment.id}
                 className="animate-fade-in-up"
@@ -313,18 +473,31 @@ export default function GalleryView() {
             ))}
           </div>
         ) : (
-          /* 🎭 Empty State: 詩的な空状態 */
+          /* 🎭 Empty State: 検索結果なし or 全体が空 */
           <div className="text-center py-24 animate-fade-in-up">
             <div className="w-24 h-24 mx-auto mb-8 opacity-20">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="0.5" className="w-full h-full text-[#6a6a6a]">
-                <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
-              </svg>
+              {searchQuery || selectedTechnologies.length > 0 ? (
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="0.5" className="w-full h-full text-[#6a6a6a]">
+                  <circle cx="11" cy="11" r="8"/>
+                  <path d="21 21l-4.35-4.35"/>
+                </svg>
+              ) : (
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="0.5" className="w-full h-full text-[#6a6a6a]">
+                  <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+                </svg>
+              )}
             </div>
             <p className="text-[#6a6a6a] text-sm font-light mb-2">
-              まだ構造のかけらはありません
+              {searchQuery || selectedTechnologies.length > 0 
+                ? '条件に一致する構造が見つかりませんでした'
+                : 'まだ構造のかけらはありません'
+              }
             </p>
             <p className="text-xs text-[#6a6a6a]/60">
-              最初の Fragment を投稿してみましょう
+              {searchQuery || selectedTechnologies.length > 0 
+                ? '検索条件を変更してみてください'
+                : '最初の Fragment を投稿してみましょう'
+              }
             </p>
           </div>
         )}
