@@ -11,7 +11,6 @@ import { Fragment, Whisper } from '@/types/fragment'
 
 // 🆕 新しいデザインシステムコンポーネントをインポート
 import { FragmentTitle, FragmentDescription } from '../design-system/BilingualText/BilingualText'
-import { FragmentCategoryBadge } from '../design-system/CategoryBadge/CategoryBadge'
 import { FragmentCreator } from '../design-system/CreatorNickname/CreatorNickname'
 
 interface ExtendedFragment extends Fragment {
@@ -24,7 +23,74 @@ interface ExtendedFragment extends Fragment {
 interface FragmentCardProps {
   fragment: ExtendedFragment
   index?: number
-  onUpdate?: () => void // 🔄 リアルタイム更新コールバック
+  onUpdate?: () => void
+}
+
+// 🎨 技術タグコンポーネント - 控えめグレー版
+function TechTag({ tech, className = '' }: { tech: string; className?: string }) {
+  return (
+    <span className={`
+      inline-flex items-center px-2 py-0.5 text-xs font-medium tracking-wide
+      bg-slate-50 text-slate-500 border border-slate-200/50 rounded-md
+      transition-colors duration-200
+      ${className}
+    `}>
+      {tech}
+    </span>
+  )
+}
+
+// 🔍 コードから技術を自動検出
+function detectTechnologies(code: string): string[] {
+  const codeUpper = code.toUpperCase()
+  const technologies: string[] = []
+
+  // Canvas系
+  if (codeUpper.includes('CANVAS') || codeUpper.includes('GETCONTEXT') || codeUpper.includes('2D')) {
+    technologies.push('CANVAS')
+  }
+
+  // Three.js/WebGL
+  if (codeUpper.includes('THREE') || codeUpper.includes('WEBGL') || codeUpper.includes('GL_')) {
+    technologies.push('THREE')
+  }
+
+  // Interactive
+  if (codeUpper.includes('ADDEVENTLISTENER') || codeUpper.includes('ONCLICK') || codeUpper.includes('MOUSEMOVE')) {
+    technologies.push('INTERACTIVE')
+  }
+
+  // HTML5 API
+  if (codeUpper.includes('GETELEMENTBYID') || codeUpper.includes('QUERYSELECTOR')) {
+    technologies.push('HTML5')
+  }
+
+  // CSS Animation
+  if (codeUpper.includes('@KEYFRAMES') || codeUpper.includes('ANIMATION:')) {
+    technologies.push('CSS')
+  }
+
+  // P5.js
+  if (codeUpper.includes('P5') || codeUpper.includes('SETUP()') || codeUpper.includes('DRAW()')) {
+    technologies.push('P5.JS')
+  }
+
+  // L-system (プロンプトからも検出)
+  if (codeUpper.includes('L-SYSTEM') || codeUpper.includes('LINDENMAYER')) {
+    technologies.push('L-SYSTEM')
+  }
+
+  // SVG
+  if (codeUpper.includes('<SVG') || codeUpper.includes('CREATEELEMENT(\'SVG\'')) {
+    technologies.push('SVG')
+  }
+
+  // デフォルトでCANVASを追加（何も検出されない場合）
+  if (technologies.length === 0) {
+    technologies.push('CANVAS')
+  }
+
+  return technologies
 }
 
 export default function FragmentCard({ 
@@ -62,15 +128,11 @@ export default function FragmentCard({
   // 📊 Fragment番号のフォーマット（3桁ゼロパディング）
   const fragmentNumber = `Fragment ${String(fragment.display_number || index + 1).padStart(3, '0')}`
 
-  // 🔄 Props変化時の状態同期（重要：データベース ↔ UI）
-  useEffect(() => {
-    console.log('🔄 Syncing fragment state:', {
-      id: fragment.id,
-      user_has_resonated: fragment.user_has_resonated,
-      resonance_count: fragment.resonance_count,
-      whisper_count: fragment.whisper_count
-    })
+  // 🔍 技術検出
+  const detectedTechnologies = detectTechnologies(fragment.code)
 
+  // 🔄 Props変化時の状態同期
+  useEffect(() => {
     setHasResonated(fragment.user_has_resonated)
     setResonanceCount(fragment.resonance_count)
     setWhisperCount(fragment.whisper_count)
@@ -81,34 +143,26 @@ export default function FragmentCard({
     fragment.id
   ])
 
-  // 🎯 共鳴ハンドラ: 楽観的UI更新 + データ同期
+  // 🎯 共鳴ハンドラ
   const handleResonate = useCallback(async (success: boolean) => {
     if (success && !hasResonated) {
-      // 👍 楽観的UI更新（即座反映）
       setHasResonated(true)
       setResonanceCount(prev => prev + 1)
-      
-      // 🎊 成功フィードバック
       setToastMessage('共鳴が生まれました')
       setShowToast(true)
       
-      // 🔄 親コンポーネント更新（1秒後）
       setTimeout(() => {
         if (onUpdate) onUpdate()
       }, 1000)
     }
   }, [hasResonated, onUpdate])
 
-  // 💬 Whisperハンドラ: リアルタイム更新
+  // 💬 Whisperハンドラ
   const handleWhisper = useCallback((content: string) => {
-    // 👍 楽観的UI更新
     setWhisperCount(prev => prev + 1)
-    
-    // 🎊 成功フィードバック
     setToastMessage('言葉が添えられました')
     setShowToast(true)
     
-    // 🔄 親コンポーネント更新（1秒後）
     setTimeout(() => {
       if (onUpdate) onUpdate()
     }, 1000)
@@ -184,7 +238,7 @@ export default function FragmentCard({
 
   return (
     <>
-      {/* 🎨 Main Card: レイヤード設計 + ホバーエフェクト */}
+      {/* 🎨 Main Card: 構造化レイアウト */}
       <motion.div
         initial={{ opacity: 0, y: 24 }}
         animate={{ opacity: 1, y: 0 }}
@@ -196,7 +250,7 @@ export default function FragmentCard({
                    hover:shadow-xl hover:shadow-[#3a3a3a]/5 hover:border-[#3a3a3a]/20 transition-all duration-500
                    hover:-translate-y-1"
       >
-        {/* 🖼️ Preview Area: サムネイル + Canvas */}
+        {/* 🖼️ Preview Area: 完全クリーン */}
         <div 
           className="relative w-full h-64 bg-[#f9f8f6] cursor-pointer overflow-hidden group/preview"
           onClick={() => setShowFullscreen(true)}
@@ -245,29 +299,17 @@ export default function FragmentCard({
                 fragmentId={fragment.id}
                 className="w-full h-full transition-transform duration-700 group-hover/preview:scale-105"
               />
-              {/* フォールバック時の微細なオーバーレイ */}
               <div className="absolute inset-0 bg-gradient-to-t from-black/5 to-transparent pointer-events-none"></div>
             </div>
           )}
 
-          {/* Fragment番号 - 洗練されたタイポグラフィ */}
+          {/* Fragment番号のみ - 最小限 */}
           <div className="absolute top-3 left-3 bg-white/90 backdrop-blur-md px-3 py-1.5 rounded-md
                          border border-white/50 shadow-sm">
             <span className="text-xs font-light text-[#6a6a6a] tracking-wide">
               {fragmentNumber}
             </span>
           </div>
-
-          {/* 🆕 カテゴリバッジ - 右上に表示 */}
-          {fragment.category && (
-            <div className="absolute top-3 right-3">
-              <FragmentCategoryBadge 
-                fragment={fragment} 
-                size="xs"
-                className="bg-white/90 backdrop-blur-md shadow-sm"
-              />
-            </div>
-          )}
 
           {/* ホバー時のプレビュー指示 */}
           <div className="absolute inset-0 bg-black/0 group-hover/preview:bg-black/10 transition-colors duration-300
@@ -278,93 +320,110 @@ export default function FragmentCard({
           </div>
         </div>
 
-        {/* 📝 Card Content: 情報とアクション */}
-        <div className="p-5 space-y-4">
-          {/* タイトル + メニュー */}
-          <div className="flex items-start justify-between gap-3">
-            {/* 🆕 バイリンガルタイトル表示 */}
-            <FragmentTitle 
-              fragment={fragment} 
-              className="flex-1 min-w-0"
-            />
-            
-            {/* 3点メニュー - ミニマル設計 */}
-            <div ref={menuRef} className="relative flex-shrink-0">
-              <button
-                onClick={() => setMenuOpen(!menuOpen)}
-                className="p-2 -m-2 hover:bg-[#3a3a3a]/5 rounded-lg transition-colors duration-200 group/menu"
-                aria-label="メニューを開く"
-              >
-                <svg className="w-4 h-4 text-[#6a6a6a] group-hover/menu:text-[#3a3a3a] transition-colors" 
-                     fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
-                </svg>
-              </button>
+        {/* 📝 Card Content: 構造化情報レイアウト */}
+        <div className="p-5">
+          {/* 🎨 作品内容層 - タイトル・説明 */}
+          <div className="space-y-3 mb-4">
+            {/* タイトル + メニュー */}
+            <div className="flex items-start justify-between gap-3">
+              <FragmentTitle 
+                fragment={fragment} 
+                className="flex-1 min-w-0"
+              />
+              
+              {/* 3点メニュー */}
+              <div ref={menuRef} className="relative flex-shrink-0">
+                <button
+                  onClick={() => setMenuOpen(!menuOpen)}
+                  className="p-2 -m-2 hover:bg-[#3a3a3a]/5 rounded-lg transition-colors duration-200 group/menu"
+                  aria-label="メニューを開く"
+                >
+                  <svg className="w-4 h-4 text-[#6a6a6a] group-hover/menu:text-[#3a3a3a] transition-colors" 
+                       fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
+                  </svg>
+                </button>
 
-              {/* ドロップダウンメニュー */}
-              <AnimatePresence>
-                {menuOpen && (
-                  <motion.div
-                    initial={{ opacity: 0, scale: 0.95, y: -8 }}
-                    animate={{ opacity: 1, scale: 1, y: 0 }}
-                    exit={{ opacity: 0, scale: 0.95, y: -8 }}
-                    transition={{ duration: 0.15 }}
-                    className="absolute right-0 top-full mt-2 w-48 bg-white/95 backdrop-blur-md rounded-lg 
-                              shadow-lg border border-[#3a3a3a]/10 py-1 z-20"
-                  >
-                    <button
-                      onClick={() => {
-                        setShowDeleteModal(true)
-                        setMenuOpen(false)
-                      }}
-                      className="w-full text-left px-4 py-2.5 text-sm text-[#6a6a6a] hover:text-[#1c1c1c] 
-                                hover:bg-[#3a3a3a]/5 transition-colors duration-150"
+                {/* ドロップダウンメニュー */}
+                <AnimatePresence>
+                  {menuOpen && (
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.95, y: -8 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.95, y: -8 }}
+                      transition={{ duration: 0.15 }}
+                      className="absolute right-0 top-full mt-2 w-48 bg-white/95 backdrop-blur-md rounded-lg 
+                                shadow-lg border border-[#3a3a3a]/10 py-1 z-20"
                     >
-                      削除
-                    </button>
-                    <button
-                      onClick={copyCode}
-                      className="w-full text-left px-4 py-2.5 text-sm text-[#6a6a6a] hover:text-[#1c1c1c] 
-                                hover:bg-[#3a3a3a]/5 transition-colors duration-150"
-                    >
-                      コードをコピー
-                    </button>
-                    {fragment.prompt && (
                       <button
-                        onClick={copyPrompt}
+                        onClick={() => {
+                          setShowDeleteModal(true)
+                          setMenuOpen(false)
+                        }}
                         className="w-full text-left px-4 py-2.5 text-sm text-[#6a6a6a] hover:text-[#1c1c1c] 
                                   hover:bg-[#3a3a3a]/5 transition-colors duration-150"
                       >
-                        プロンプトをコピー
+                        削除
                       </button>
-                    )}
-                  </motion.div>
-                )}
-              </AnimatePresence>
+                      <button
+                        onClick={copyCode}
+                        className="w-full text-left px-4 py-2.5 text-sm text-[#6a6a6a] hover:text-[#1c1c1c] 
+                                  hover:bg-[#3a3a3a]/5 transition-colors duration-150"
+                      >
+                        コードをコピー
+                      </button>
+                      {fragment.prompt && (
+                        <button
+                          onClick={copyPrompt}
+                          className="w-full text-left px-4 py-2.5 text-sm text-[#6a6a6a] hover:text-[#1c1c1c] 
+                                    hover:bg-[#3a3a3a]/5 transition-colors duration-150"
+                        >
+                          プロンプトをコピー
+                        </button>
+                      )}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
             </div>
+
+            {/* バイリンガル説明文 */}
+            <FragmentDescription 
+              fragment={fragment}
+              maxLength={120}
+            />
           </div>
 
-          {/* 🆕 バイリンガル説明文 */}
-          <FragmentDescription 
-            fragment={fragment}
-            maxLength={120}
-          />
+          {/* 🔧 制作技術層 - プロンプト・技術タグ */}
+          {(fragment.prompt || detectedTechnologies.length > 0) && (
+            <div className="space-y-3 mb-6 pb-4 border-b border-[#3a3a3a]/5">
+              {/* プロンプト */}
+              {fragment.prompt && (
+                <div className="bg-[#f9f8f6] rounded-lg p-3 border border-[#3a3a3a]/5">
+                  <div className="flex items-start gap-2">
+                    <span className="text-xs text-[#6a6a6a]/60 font-light shrink-0 mt-0.5">Prompt:</span>
+                    <p className="text-xs text-[#6a6a6a] italic leading-relaxed">
+                      {fragment.prompt.slice(0, 120)}
+                      {fragment.prompt.length > 120 && '...'}
+                    </p>
+                  </div>
+                </div>
+              )}
 
-          {/* プロンプト */}
-          {fragment.prompt && (
-            <div className="p-3 bg-[#f9f8f6] rounded-lg border border-[#3a3a3a]/5">
-              <div className="flex items-start gap-2">
-                <span className="text-xs text-[#6a6a6a]/60 font-light shrink-0 mt-0.5">Prompt:</span>
-                <p className="text-xs text-[#6a6a6a] italic leading-relaxed">
-                  {fragment.prompt.slice(0, 120)}
-                  {fragment.prompt.length > 120 && '...'}
-                </p>
-              </div>
+              {/* 🎯 技術タグ群 - プロンプト直下の統一グレー */}
+              {detectedTechnologies.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {detectedTechnologies.map((tech, index) => (
+                    <TechTag key={index} tech={tech} />
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
-          {/* アクションエリア */}
-          <div className="flex items-center justify-between pt-2">
+          {/* 📊 メタデータ層 - アクション・作者・日時 */}
+          <div className="flex items-center justify-between">
+            {/* アクションボタン */}
             <div className="flex items-center gap-4">
               <ResonanceButton 
                 fragmentId={fragment.id}
@@ -379,9 +438,9 @@ export default function FragmentCard({
               />
             </div>
 
-            {/* 🆕 創作者 + 作成日時エリア */}
+            {/* メタデータ情報 */}
             <div className="flex items-center gap-3 text-xs text-[#6a6a6a]/60">
-              {/* 創作者ニックネーム */}
+              {/* 創作者 */}
               {(fragment.creator_nickname || fragment.creator_hash) && (
                 <FragmentCreator 
                   fragment={fragment}
