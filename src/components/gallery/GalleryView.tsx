@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import FragmentCard from './FragmentCard'
+import FullscreenModal from './FullscreenModal'
 import { Fragment } from '@/types/fragment'
 import { generateUserIpHash, debugHashGeneration } from '@/lib/hashUtils'
 
@@ -18,6 +19,10 @@ export default function GalleryView() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [userIpHash, setUserIpHash] = useState<string>('')
+  
+  // 🎨 FullscreenModal管理
+  const [isFullscreenOpen, setIsFullscreenOpen] = useState(false)
+  const [currentFragmentIndex, setCurrentFragmentIndex] = useState<number>(0)
 
   // ✨ デザインシステム: 段階的出現遅延
   const ANIMATION_DELAYS = {
@@ -27,6 +32,33 @@ export default function GalleryView() {
     cards: 360,
     cardStagger: 120
   }
+
+  // 🎭 FullscreenModal制御関数
+  const openFullscreen = useCallback((fragmentIndex: number) => {
+    setCurrentFragmentIndex(fragmentIndex)
+    setIsFullscreenOpen(true)
+  }, [])
+
+  const closeFullscreen = useCallback(() => {
+    setIsFullscreenOpen(false)
+  }, [])
+
+  const goToNext = useCallback(() => {
+    if (currentFragmentIndex < fragments.length - 1) {
+      setCurrentFragmentIndex(prev => prev + 1)
+    }
+  }, [currentFragmentIndex, fragments.length])
+
+  const goToPrevious = useCallback(() => {
+    if (currentFragmentIndex > 0) {
+      setCurrentFragmentIndex(prev => prev - 1)
+    }
+  }, [currentFragmentIndex])
+
+  // 🎯 現在のFragment取得
+  const currentFragment = fragments[currentFragmentIndex]
+  const hasNext = currentFragmentIndex < fragments.length - 1
+  const hasPrevious = currentFragmentIndex > 0
 
   // 🎯 データ取得: 完全な関連データ + ユーザー状態
   const fetchFragments = useCallback(async () => {
@@ -275,6 +307,7 @@ export default function GalleryView() {
                   fragment={fragment} 
                   index={index}
                   onUpdate={() => handleFragmentUpdate(fragment.id)}
+                  onOpenFullscreen={() => openFullscreen(index)}
                 />
               </div>
             ))}
@@ -296,6 +329,19 @@ export default function GalleryView() {
           </div>
         )}
       </div>
+
+      {/* 🎭 FullscreenModal: 統合ナビゲーション */}
+      {currentFragment && (
+        <FullscreenModal
+          fragment={currentFragment}
+          isOpen={isFullscreenOpen}
+          onClose={closeFullscreen}
+          onNext={hasNext ? goToNext : undefined}
+          onPrevious={hasPrevious ? goToPrevious : undefined}
+          hasNext={hasNext}
+          hasPrevious={hasPrevious}
+        />
+      )}
 
       {/* 🎨 カスタムアニメーション定義 */}
       <style jsx global>{`

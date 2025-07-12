@@ -3,7 +3,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import CodePreview from '../canvas/CodePreview'
-import FullscreenModal from './FullscreenModal'
 import WhisperButton from './WhisperButton'
 import ResonanceButton from './ResonanceButton'
 import Toast from './Toast'
@@ -24,6 +23,7 @@ interface FragmentCardProps {
   fragment: ExtendedFragment
   index?: number
   onUpdate?: () => void
+  onOpenFullscreen?: () => void
 }
 
 // 🎨 技術タグコンポーネント - 控えめグレー版
@@ -96,7 +96,8 @@ function detectTechnologies(code: string): string[] {
 export default function FragmentCard({ 
   fragment, 
   index = 0,
-  onUpdate 
+  onUpdate,
+  onOpenFullscreen
 }: FragmentCardProps) {
   // 🎯 State Management: データベース同期状態
   const [hasResonated, setHasResonated] = useState(fragment.user_has_resonated)
@@ -108,7 +109,6 @@ export default function FragmentCard({
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [deletePassword, setDeletePassword] = useState('')
   const [deleting, setDeleting] = useState(false)
-  const [showFullscreen, setShowFullscreen] = useState(false)
   const [showToast, setShowToast] = useState(false)
   const [toastMessage, setToastMessage] = useState('')
   
@@ -174,6 +174,13 @@ export default function FragmentCard({
     setImageError(true)
     console.warn(`⚠️ Failed to load thumbnail for ${fragmentNumber}`)
   }, [fragmentNumber])
+
+  // 🖼️ プレビュークリックハンドラ
+  const handlePreviewClick = useCallback(() => {
+    if (onOpenFullscreen) {
+      onOpenFullscreen()
+    }
+  }, [onOpenFullscreen])
 
   // 🖱️ メニュー制御
   useEffect(() => {
@@ -253,7 +260,7 @@ export default function FragmentCard({
         {/* 🖼️ Preview Area: 完全クリーン */}
         <div 
           className="relative w-full h-64 bg-[#f9f8f6] cursor-pointer overflow-hidden group/preview"
-          onClick={() => setShowFullscreen(true)}
+          onClick={handlePreviewClick}
         >
           {/* サムネイル優先表示システム */}
           {fragment.thumbnail_url && !imageError ? (
@@ -465,13 +472,6 @@ export default function FragmentCard({
           </div>
         </div>
       </motion.div>
-
-      {/* 🎭 Modals */}
-      <FullscreenModal
-        fragment={fragment}
-        isOpen={showFullscreen}
-        onClose={() => setShowFullscreen(false)}
-      />
 
       {/* 🗑️ 削除確認モーダル */}
       <AnimatePresence>
