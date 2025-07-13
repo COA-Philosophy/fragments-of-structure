@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { supabase } from '@/lib/supabase'
 import FragmentCard from './FragmentCard'
 import FullscreenModal from './FullscreenModal'
+import DiscoveryBar from '../discovery/DiscoveryBar'
 import { Fragment } from '@/types/fragment'
 import { generateUserIpHash, debugHashGeneration } from '@/lib/hashUtils'
 
@@ -13,6 +14,9 @@ interface ExtendedFragment extends Fragment {
   whisper_count: number
   user_has_resonated: boolean
 }
+
+type SortType = 'newest' | 'popular' | 'trending' | 'technology'
+type ViewMode = 'grid' | 'list'
 
 export default function GalleryView() {
   const [fragments, setFragments] = useState<ExtendedFragment[]>([])
@@ -30,11 +34,15 @@ export default function GalleryView() {
   const [filteredFragments, setFilteredFragments] = useState<ExtendedFragment[]>([])
   const [availableTechnologies, setAvailableTechnologies] = useState<string[]>([])
 
+  // ✨ 新規: ソート・表示機能
+  const [sortBy, setSortBy] = useState<SortType>('newest')
+  const [viewMode, setViewMode] = useState<ViewMode>('grid')
+
   // ✨ デザインシステム: 段階的出現遅延
   const ANIMATION_DELAYS = {
     header: 0,
     subtitle: 120,
-    counter: 240,
+    discovery: 240,
     cards: 360,
     cardStagger: 120
   }
@@ -114,7 +122,42 @@ export default function GalleryView() {
     return technologies.length > 0 ? technologies : ['CANVAS']
   }, [])
 
-  // 🔍 フィルター関数
+  // 📊 ソート機能
+  const sortFragments = useCallback((fragments: ExtendedFragment[], sortType: SortType): ExtendedFragment[] => {
+    const sorted = [...fragments]
+    
+    switch (sortType) {
+      case 'newest':
+        return sorted.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+      
+      case 'popular':
+        return sorted.sort((a, b) => b.resonance_count - a.resonance_count)
+      
+      case 'trending':
+        // トレンド = 最近の共鳴数/経過時間の比率
+        return sorted.sort((a, b) => {
+          const now = Date.now()
+          const aAge = now - new Date(a.created_at).getTime()
+          const bAge = now - new Date(b.created_at).getTime()
+          const aTrending = (a.resonance_count + 1) / (aAge / (1000 * 60 * 60 * 24) + 1) // 日数で正規化
+          const bTrending = (b.resonance_count + 1) / (bAge / (1000 * 60 * 60 * 24) + 1)
+          return bTrending - aTrending
+        })
+      
+      case 'technology':
+        // 技術複雑度順（使用技術数でソート）
+        return sorted.sort((a, b) => {
+          const aTechCount = detectTechnologies(a.code).length
+          const bTechCount = detectTechnologies(b.code).length
+          return bTechCount - aTechCount
+        })
+      
+      default:
+        return sorted
+    }
+  }, [detectTechnologies])
+
+  // 🔍 フィルター関数（ソート統合）
   const filterFragments = useCallback(() => {
     let filtered = [...fragments]
 
@@ -140,9 +183,12 @@ export default function GalleryView() {
       })
     }
 
+    // ソート適用
+    filtered = sortFragments(filtered, sortBy)
+
     setFilteredFragments(filtered)
     setCurrentFragmentIndex(0) // フィルター時はインデックスリセット
-  }, [fragments, searchQuery, selectedTechnologies, detectTechnologies])
+  }, [fragments, searchQuery, selectedTechnologies, sortBy, detectTechnologies, sortFragments])
 
   // 🏷️ 利用可能な技術タグ抽出
   const extractAvailableTechnologies = useCallback(() => {
@@ -369,77 +415,42 @@ export default function GalleryView() {
           >
             構造のかけらたち
           </p>
-
-          {/* 🔍 検索・フィルターシステム */}
-          <div 
-            className="animate-fade-in-up space-y-4"
-            style={{ animationDelay: `${ANIMATION_DELAYS.counter}ms` }}
-          >
-            {/* 検索バー */}
-            <div className="max-w-md mx-auto">
-              <div className="relative">
-                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                  <svg className="h-4 w-4 text-[#6a6a6a]/60" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                  </svg>
-                </div>
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-12 pr-4 py-3 bg-white/80 backdrop-blur-sm border border-[#3a3a3a]/10 rounded-full focus:outline-none focus:border-[#3a3a3a]/30 focus:bg-white transition-all duration-300 text-[#1c1c1c] placeholder-[#6a6a6a]/60 text-sm font-light"
-                  placeholder="作品を検索..."
-                />
-              </div>
-            </div>
-
-            {/* 技術タグフィルター */}
-            {availableTechnologies.length > 0 && (
-              <div className="flex flex-wrap justify-center gap-2 max-w-4xl mx-auto">
-                {availableTechnologies.map((tech) => (
-                  <button
-                    key={tech}
-                    onClick={() => toggleTechnology(tech)}
-                    className={`inline-flex items-center px-3 py-1.5 text-xs font-medium tracking-wide rounded-full transition-all duration-200 border ${selectedTechnologies.includes(tech) ? 'bg-[#3a3a3a] text-white border-[#3a3a3a] shadow-sm' : 'bg-slate-50 text-slate-500 border-slate-200/50 hover:border-slate-300 hover:bg-slate-100'}`}
-                  >
-                    {tech}
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {/* フィルター状態表示 */}
-            <div className="flex items-center justify-center gap-4 text-xs text-[#6a6a6a]/60">
-              <span>
-                {filteredFragments.length} の構造が見つかりました
-                {searchQuery || selectedTechnologies.length > 0 ? (
-                  <span className="ml-2">
-                    ({fragments.length} 件中)
-                  </span>
-                ) : null}
-              </span>
-              
-              {(searchQuery || selectedTechnologies.length > 0) && (
-                <button
-                  onClick={clearFilters}
-                  className="text-[#3a3a3a] hover:text-[#1c1c1c] transition-colors duration-200 underline underline-offset-2"
-                >
-                  フィルタークリア
-                </button>
-              )}
-            </div>
-          </div>
         </div>
+      </div>
+
+      {/* 🔍 DiscoveryBar: 統合検索・フィルターシステム */}
+      <div 
+        className="animate-fade-in-up"
+        style={{ animationDelay: `${ANIMATION_DELAYS.discovery}ms` }}
+      >
+        <DiscoveryBar
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          selectedTechnologies={selectedTechnologies}
+          onTechnologyToggle={toggleTechnology}
+          onTechnologyClear={clearFilters}
+          sortBy={sortBy}
+          onSortChange={setSortBy}
+          viewMode={viewMode}
+          onViewModeChange={setViewMode}
+          resultCount={filteredFragments.length}
+          totalCount={fragments.length}
+          availableTechnologies={availableTechnologies}
+        />
       </div>
 
       {/* 🔧 デバッグ情報: 開発環境限定 */}
       {process.env.NODE_ENV === 'development' && (
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-8">
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-xs text-blue-800">
-            <p className="font-medium mb-2">🔧 [Step 2] Debug Information - Unified Hash System</p>
+            <p className="font-medium mb-2">🔧 [Step 3] Debug Information - DiscoveryBar Integration</p>
             <p className="mb-1">User Hash: <code className="bg-blue-100 px-1 rounded">{userIpHash}</code></p>
             <p className="mb-1">
               Search: <code className="bg-blue-100 px-1 rounded">"{searchQuery}"</code> | 
+              Sort: <code className="bg-blue-100 px-1 rounded">{sortBy}</code> |
+              View: <code className="bg-blue-100 px-1 rounded">{viewMode}</code>
+            </p>
+            <p className="mb-1">
               Tech Filters: <code className="bg-blue-100 px-1 rounded">[{selectedTechnologies.join(', ')}]</code>
             </p>
             <p>
@@ -451,10 +462,14 @@ export default function GalleryView() {
         </div>
       )}
 
-      {/* 🎨 Gallery Grid: レスポンシブ + ステージングアニメーション */}
+      {/* 🎨 Gallery Grid: レスポンシブ + 表示モード対応 */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-16">
         {filteredFragments.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          <div className={
+            viewMode === 'grid' 
+              ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6"
+              : "space-y-6"
+          }>
             {filteredFragments.map((fragment, index) => (
               <div 
                 key={fragment.id}
