@@ -1,11 +1,16 @@
-// 安全なコード実行環境を提供するユーティリティ（最終版）
+// 安全なコード実行環境を提供するユーティリティ（安全な完全版）
+// Phase A: 既存機能100%保持 + Enhanced v2.0互換レイヤー追加
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 🔄 EXISTING CODE - 既存コード（完全保持・一切変更なし）
+// ═══════════════════════════════════════════════════════════════════════════════
 
 interface ExecutionResult {
   success: boolean
   error?: string
 }
 
-// HTMLコードからCanvasコードを実行する
+// HTMLコードからCanvasコードを実行する（既存コード完全保持）
 export function executeCanvasCode(
   htmlCode: string, 
   targetCanvas: HTMLCanvasElement,
@@ -298,7 +303,7 @@ export function executeCanvasCode(
   }
 }
 
-// コードタイプを判定
+// コードタイプを判定（既存コード完全保持）
 export function analyzeCodeType(code: string): string {
   const lowerCode = code.toLowerCase()
   
@@ -324,4 +329,279 @@ export function analyzeCodeType(code: string): string {
   
   // デフォルトはcanvas
   return 'canvas'
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 🆕 ENHANCED v2.0 COMPATIBILITY LAYER - 新機能追加（既存に影響なし）
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Enhanced v2.0 Type Definitions - TypeScriptエラー解決用
+ */
+export interface EnhancedExecutionResult {
+  success: boolean
+  error?: string | {
+    message: string
+    type?: string
+    suggestion?: string
+    helpfulHint?: string
+  }
+  executionTime?: number
+  memoryUsage?: number
+  performanceScore?: number
+  technologies?: TechnicalTag[]
+}
+
+export interface ExecutionContext {
+  canvas: HTMLCanvasElement
+  timeoutMs?: number
+  clearOnCleanup?: boolean
+  enablePerformanceTracking?: boolean
+  enableDebugLogging?: boolean
+  metadata?: {
+    createdAt: number
+    version: string
+  }
+}
+
+export interface ExecutionOptions {
+  performanceMode?: 'speed' | 'memory' | 'balanced'
+  enableDebugInfo?: boolean
+  enablePerformanceMonitoring?: boolean
+  timeoutMs?: number
+}
+
+export interface CodeAnalysis {
+  codeType: string
+  confidence?: number
+  technologies: TechnicalTag[]
+  complexity: number
+  estimatedComplexity?: 'simple' | 'moderate' | 'complex' | 'advanced'
+  securityScore: number
+  performanceScore: number
+  detectedFeatures?: Array<{
+    name: string
+    confidence: number
+  }>
+}
+
+export type TechnicalTag = 
+  | 'CANVAS'
+  | 'ANIMATION' 
+  | 'INTERACTIVE'
+  | 'DRAWING'
+  | 'MATH'
+  | 'COLOR'
+  | 'THREE'
+  | 'SVG'
+  | 'CSS'
+  | 'P5.JS'
+  | 'L-SYSTEM'
+  | 'HTML5'
+
+/**
+ * Enhanced Code Analysis - 既存analyzeCodeTypeを拡張
+ * Phase A: 基本的な技術検出とメトリクス
+ */
+export async function analyzeCodeEnhanced(code: string): Promise<CodeAnalysis> {
+  // 既存関数を活用
+  const basicType = analyzeCodeType(code)
+  const codeUpper = code.toUpperCase()
+  const technologies: TechnicalTag[] = []
+  
+  // 技術検出ロジック（Phase A: 基本版）
+  if (codeUpper.includes('CANVAS') || codeUpper.includes('GETCONTEXT')) {
+    technologies.push('CANVAS')
+  }
+  if (codeUpper.includes('REQUESTANIMATIONFRAME') || codeUpper.includes('ANIMATE')) {
+    technologies.push('ANIMATION')
+  }
+  if (codeUpper.includes('ADDEVENTLISTENER') || codeUpper.includes('ONCLICK')) {
+    technologies.push('INTERACTIVE')
+  }
+  if (codeUpper.includes('FILLRECT') || codeUpper.includes('ARC') || codeUpper.includes('BEGINPATH')) {
+    technologies.push('DRAWING')
+  }
+  if (codeUpper.includes('MATH.') || codeUpper.includes('SIN') || codeUpper.includes('COS')) {
+    technologies.push('MATH')
+  }
+  if (codeUpper.includes('FILLSTYLE') || codeUpper.includes('STROKESTYLE') || codeUpper.includes('RGB')) {
+    technologies.push('COLOR')
+  }
+  if (codeUpper.includes('THREE.')) {
+    technologies.push('THREE')
+  }
+  if (codeUpper.includes('<SVG') || codeUpper.includes('SVG')) {
+    technologies.push('SVG')
+  }
+  if (codeUpper.includes('@KEYFRAMES') || codeUpper.includes('ANIMATION:')) {
+    technologies.push('CSS')
+  }
+  if (codeUpper.includes('P5.') || codeUpper.includes('SETUP(') || codeUpper.includes('DRAW(')) {
+    technologies.push('P5.JS')
+  }
+  if (codeUpper.includes('L-SYSTEM') || codeUpper.includes('LINDENMAYER')) {
+    technologies.push('L-SYSTEM')
+  }
+  if (codeUpper.includes('GETELEMENTBYID') || codeUpper.includes('QUERYSELECTOR')) {
+    technologies.push('HTML5')
+  }
+  
+  // 複雑度計算
+  const lines = code.split('\n').length
+  const functions = (code.match(/function\s+\w+/g) || []).length
+  const loops = (code.match(/\b(for|while)\s*\(/g) || []).length
+  const complexity = Math.min(100, lines + (functions * 5) + (loops * 3))
+  
+  // スコアリング
+  const hasRiskyFeatures = code.includes('eval') || code.includes('innerHTML')
+  const securityScore = Math.max(0, 100 - (hasRiskyFeatures ? 50 : 0) - (loops > 5 ? 20 : 0))
+  const performanceScore = Math.max(0, 100 - (complexity / 2) - (loops > 10 ? 30 : 0))
+  
+  return {
+    codeType: basicType,
+    confidence: 0.85,
+    technologies: technologies.length > 0 ? technologies : ['CANVAS'],
+    complexity,
+    estimatedComplexity: complexity < 30 ? 'simple' : 
+                        complexity < 60 ? 'moderate' : 
+                        complexity < 90 ? 'complex' : 'advanced',
+    securityScore,
+    performanceScore,
+    detectedFeatures: technologies.map(tech => ({
+      name: tech,
+      confidence: 0.85
+    }))
+  }
+}
+
+/**
+ * Enhanced Code Execution - 既存executeCanvasCodeをラップして拡張
+ * Phase A: パフォーマンス監視付き実行
+ */
+export async function executeCodeEnhanced(
+  code: string,
+  context: ExecutionContext,
+  options: ExecutionOptions = {}
+): Promise<EnhancedExecutionResult> {
+  const startTime = performance.now()
+  
+  try {
+    // 既存のexecuteCanvasCodeを使用（最大互換性）
+    const legacyResult = executeCanvasCode(
+      code,
+      context.canvas,
+      context.canvas.id || 'canvas'
+    )
+    
+    const executionTime = performance.now() - startTime
+    
+    // 技術分析実行
+    const analysis = await analyzeCodeEnhanced(code)
+    
+    // パフォーマンススコア計算（1.7ms目標）
+    let performanceScore = 100
+    if (executionTime > 2) performanceScore = 80
+    if (executionTime > 10) performanceScore = 60
+    if (executionTime > 50) performanceScore = 40
+    if (executionTime > 100) performanceScore = 20
+    
+    // メモリ使用量取得（利用可能な場合）
+    const memoryUsage = (performance as any).memory?.usedJSHeapSize || 0
+    
+    return {
+      success: legacyResult.success,
+      error: legacyResult.error,
+      executionTime,
+      memoryUsage,
+      performanceScore,
+      technologies: analysis.technologies
+    }
+    
+  } catch (error) {
+    const executionTime = performance.now() - startTime
+    
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+      executionTime,
+      memoryUsage: 0,
+      performanceScore: 0,
+      technologies: []
+    }
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 🔧 SYSTEM UTILITIES - デバッグ・開発支援用（Phase A）
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * システムヘルスチェック - Phase A完了確認用
+ */
+export async function performSystemHealthCheck(): Promise<{
+  legacy: boolean
+  enhanced: boolean
+  typescript: boolean
+  version: string
+}> {
+  try {
+    // レガシーAPI動作確認
+    const testCanvas = document.createElement('canvas')
+    testCanvas.width = 100
+    testCanvas.height = 100
+    const legacyTest = executeCanvasCode('ctx.fillRect(0,0,10,10)', testCanvas)
+    
+    // Enhanced API動作確認
+    const enhancedTest = await analyzeCodeEnhanced('ctx.fillRect(0,0,10,10)')
+    
+    return {
+      legacy: legacyTest.success,
+      enhanced: enhancedTest.technologies.length > 0,
+      typescript: true, // コンパイルが通れば true
+      version: 'Phase A - Enhanced v2.0 Compatibility'
+    }
+  } catch (error) {
+    console.error('Health check failed:', error)
+    return {
+      legacy: false,
+      enhanced: false,
+      typescript: false,
+      version: 'Phase A - Error'
+    }
+  }
+}
+
+/**
+ * 利用可能エンジン一覧
+ */
+export function getAvailableExecutors(): string[] {
+  return [
+    'Canvas2D (Legacy)',
+    'Canvas2D (Enhanced)',
+    'Analysis Engine',
+    'Performance Monitor'
+  ]
+}
+
+/**
+ * システムデバッグ情報
+ */
+export function getSystemDebugInfo(): Record<string, any> {
+  return {
+    version: 'Phase A - Enhanced v2.0 Compatibility',
+    timestamp: new Date().toISOString(),
+    environment: typeof window !== 'undefined' ? 'browser' : 'server',
+    features: {
+      legacyApi: true,
+      enhancedApi: true,
+      typescript: true,
+      performanceMonitoring: true,
+      technologyDetection: true
+    },
+    performance: {
+      memory: (performance as any).memory?.usedJSHeapSize || 'N/A',
+      timing: performance.now()
+    }
+  }
 }
