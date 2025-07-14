@@ -10,7 +10,8 @@ import type {
   CodeType,
   DetectedFeature,
   SecurityRisk,
-  ExtendedError
+  ExtendedError,
+  TechnicalTag
 } from './types'
 
 import { 
@@ -30,7 +31,7 @@ import {
  */
 export abstract class BaseExecutor implements ICodeExecutor {
   abstract readonly name: string
-  abstract readonly version: string
+  readonly version: string = '2.0.0'
   abstract readonly supportedTypes: CodeType[]
 
   /**
@@ -52,10 +53,20 @@ export abstract class BaseExecutor implements ICodeExecutor {
       
       // 結果統合
       const analysis: CodeAnalysis = {
-        ...basicAnalysis,
-        ...specificAnalysis,
-        securityRisks,
-        estimatedComplexity: this.estimateComplexity(code, specificAnalysis.detectedFeatures)
+        codeType: basicAnalysis.codeType,
+        confidence: specificAnalysis.confidence,
+        technologies: this.detectTechnologies(code),
+        complexity: this.calculateComplexity(code),
+        estimatedRuntime: this.estimateRuntime(code),
+        potentialIssues: this.detectPotentialIssues(code),
+        securityScore: this.calculateSecurityScore(code),
+        performanceScore: this.calculatePerformanceScore(code),
+        recommendations: this.generateRecommendations(code),
+        detectedFeatures: specificAnalysis.detectedFeatures || [],
+        dependencies: specificAnalysis.dependencies || [],
+        securityRisks: securityRisks,
+        estimatedComplexity: this.estimateComplexity(code, specificAnalysis.detectedFeatures || []),
+        recommendedExecutor: specificAnalysis.recommendedExecutor || this.name
       }
       
       const analyzeTime = performance.now() - startTime
@@ -86,7 +97,7 @@ export abstract class BaseExecutor implements ICodeExecutor {
       console.log(`[${this.name}] Starting execution analysis...`)
       const analysis = await this.analyze(code)
       
-      if (analysis.securityRisks.some(risk => risk.level === 'critical')) {
+      if (analysis.securityRisks && analysis.securityRisks.some(risk => risk.level === 'critical')) {
         return this.createSecurityErrorResult('Critical security risks detected', analysis)
       }
       
@@ -112,10 +123,11 @@ export abstract class BaseExecutor implements ICodeExecutor {
       return {
         ...executionResult,
         executionTime,
+        technologies: analysis.technologies,
         metadata: {
           codeType: analysis.codeType,
           processedLines: processedCode.split('\n').length,
-          detectedFeatures: analysis.detectedFeatures.map(f => f.name),
+          detectedFeatures: (analysis.detectedFeatures || []).map(f => f.name),
           performance: {
             parseTime: 0, // 継承クラスで設定
             executionTime,
@@ -123,7 +135,7 @@ export abstract class BaseExecutor implements ICodeExecutor {
           },
           securityChecks: {
             passed: true,
-            warnings: analysis.securityRisks
+            warnings: (analysis.securityRisks || [])
               .filter(risk => risk.level === 'medium')
               .map(risk => risk.description)
           }
@@ -156,23 +168,35 @@ export abstract class BaseExecutor implements ICodeExecutor {
         cancelAnimationFrame(context.animationId)
         context.animationId = null
       }
+
+      // 複数アニメーション停止
+      if (context.animationIds) {
+        context.animationIds.forEach(id => cancelAnimationFrame(id))
+        context.animationIds.clear()
+      }
       
       // タイマークリア
-      context.timers.timeouts.forEach(id => clearTimeout(id))
-      context.timers.intervals.forEach(id => clearInterval(id))
-      context.timers.timeouts = []
-      context.timers.intervals = []
+      if (context.timers) {
+        context.timers.timeouts.forEach(id => clearTimeout(id))
+        context.timers.intervals.forEach(id => clearInterval(id))
+        context.timers.timeouts = []
+        context.timers.intervals = []
+      }
       
       // イベントリスナー削除
-      context.eventListeners.forEach((listeners, event) => {
-        listeners.forEach(listener => {
-          document.removeEventListener(event, listener)
+      if (context.eventListeners) {
+        context.eventListeners.forEach((listeners, event) => {
+          listeners.forEach(listener => {
+            document.removeEventListener(event, listener)
+          })
         })
-      })
-      context.eventListeners.clear()
+        context.eventListeners.clear()
+      }
       
       // キーボードショートカット削除
-      context.keyboardShortcuts.clear()
+      if (context.keyboardShortcuts) {
+        context.keyboardShortcuts.clear()
+      }
       
       // カスタムクリーンアップ（継承クラスで実装）
       await this.performSpecificCleanup(context)
@@ -197,8 +221,8 @@ export abstract class BaseExecutor implements ICodeExecutor {
   async canExecute(code: string): Promise<boolean> {
     try {
       const analysis = await this.analyze(code)
-      return analysis.confidence > 0.7 && 
-             !analysis.securityRisks.some(risk => risk.level === 'critical')
+      return (analysis.confidence || 0) > 0.7 && 
+             !(analysis.securityRisks || []).some(risk => risk.level === 'critical')
     } catch {
       return false
     }
@@ -213,9 +237,9 @@ export abstract class BaseExecutor implements ICodeExecutor {
   protected abstract performSpecificAnalysis(code: string): Promise<{
     codeType: CodeType
     confidence: number
-    detectedFeatures: DetectedFeature[]
-    dependencies: string[]
-    recommendedExecutor: string
+    detectedFeatures?: DetectedFeature[]
+    dependencies?: string[]
+    recommendedExecutor?: string
   }>
 
   /**
@@ -236,6 +260,123 @@ export abstract class BaseExecutor implements ICodeExecutor {
   protected abstract performSpecificCleanup(context: ExecutionContext): Promise<void>
 
   // === 共通ユーティリティメソッド ===
+
+  /**
+   * 技術検出
+   */
+  protected detectTechnologies(code: string): TechnicalTag[] {
+    const codeUpper = code.toUpperCase()
+    const technologies: TechnicalTag[] = []
+
+    if (codeUpper.includes('CANVAS') || codeUpper.includes('GETCONTEXT')) {
+      technologies.push('CANVAS')
+    }
+    if (codeUpper.includes('REQUESTANIMATIONFRAME')) {
+      technologies.push('ANIMATION')
+    }
+    if (codeUpper.includes('ADDEVENTLISTENER')) {
+      technologies.push('INTERACTIVE')
+    }
+    if (codeUpper.includes('FILLRECT') || codeUpper.includes('ARC')) {
+      technologies.push('DRAWING')
+    }
+    if (codeUpper.includes('MATH.')) {
+      technologies.push('MATH')
+    }
+    if (codeUpper.includes('GRADIENT') || codeUpper.includes('RGBA')) {
+      technologies.push('COLOR')
+    }
+
+    return technologies.length > 0 ? technologies : ['CANVAS']
+  }
+
+  /**
+   * 複雑性計算
+   */
+  protected calculateComplexity(code: string): number {
+    const complexityFactors = {
+      loops: (code.match(/for|while|forEach/g) || []).length * 2,
+      functions: (code.match(/function|=>/g) || []).length * 1.5,
+      conditions: (code.match(/if|else|switch/g) || []).length * 1,
+      animations: (code.match(/requestAnimationFrame/g) || []).length * 3,
+    }
+
+    return Object.values(complexityFactors).reduce((sum, factor) => sum + factor, 1)
+  }
+
+  /**
+   * 実行時間推定
+   */
+  protected estimateRuntime(code: string): number {
+    const complexity = this.calculateComplexity(code)
+    return Math.min(complexity * 0.3, 10) // Cap at 10ms estimate
+  }
+
+  /**
+   * 潜在的問題検出
+   */
+  protected detectPotentialIssues(code: string): string[] {
+    const issues: string[] = []
+
+    if (code.includes('while(true)')) {
+      issues.push('Potential infinite loop detected')
+    }
+    if (!code.includes('requestAnimationFrame') && code.includes('animation')) {
+      issues.push('Consider using requestAnimationFrame for smooth animations')
+    }
+    if (code.length > 10000) {
+      issues.push('Large code size may impact performance')
+    }
+
+    return issues
+  }
+
+  /**
+   * セキュリティスコア計算
+   */
+  protected calculateSecurityScore(code: string): number {
+    let score = 100
+
+    if (code.includes('eval(')) score -= 30
+    if (code.includes('innerHTML')) score -= 10
+    if (code.includes('document.write')) score -= 20
+    if (code.includes('window.open')) score -= 15
+
+    return Math.max(score, 0)
+  }
+
+  /**
+   * パフォーマンススコア計算
+   */
+  protected calculatePerformanceScore(code: string): number {
+    let score = 100
+    const complexity = this.calculateComplexity(code)
+
+    if (complexity > 20) score -= 20
+    if (code.includes('setInterval')) score -= 15
+    if (!code.includes('requestAnimationFrame') && code.includes('animation')) score -= 10
+
+    return Math.max(score, 0)
+  }
+
+  /**
+   * 推奨事項生成
+   */
+  protected generateRecommendations(code: string): string[] {
+    const recommendations: string[] = []
+
+    if (!code.includes('requestAnimationFrame') && code.includes('draw')) {
+      recommendations.push('Use requestAnimationFrame for smooth animations')
+    }
+    if (code.includes('setInterval')) {
+      recommendations.push('Consider requestAnimationFrame instead of setInterval')
+    }
+    if (this.calculateComplexity(code) > 15) {
+      recommendations.push('Consider breaking down complex code into smaller functions')
+    }
+
+    return recommendations
+  }
 
   /**
    * 基本コード解析
@@ -365,19 +506,33 @@ export abstract class BaseExecutor implements ICodeExecutor {
     options: ExecutionOptions
   ): Promise<void> {
     // タイマー配列初期化
-    context.timers = {
-      timeouts: [],
-      intervals: []
+    if (!context.timers) {
+      context.timers = {
+        timeouts: [],
+        intervals: []
+      }
     }
     
     // イベントリスナー管理初期化
-    context.eventListeners = new Map()
-    context.keyboardShortcuts = new Map()
+    if (!context.eventListeners) {
+      context.eventListeners = new Map()
+    }
+    
+    if (!context.keyboardShortcuts) {
+      context.keyboardShortcuts = new Map()
+    }
+
+    // アニメーションID管理初期化
+    if (!context.animationIds) {
+      context.animationIds = new Set()
+    }
     
     // Canvas特有の準備
     if (context.canvas) {
       // Canvas ID設定
-      context.canvas.id = context.targetId
+      if (context.targetId) {
+        context.canvas.id = context.targetId
+      }
       
       // フルスクリーン時のサイズ保護
       if (context.isFullscreen) {
@@ -496,7 +651,7 @@ export abstract class BaseExecutor implements ICodeExecutor {
     return {
       success: false,
       error: message,
-      warnings: analysis.securityRisks.map(risk => risk.description)
+      warnings: (analysis.securityRisks || []).map(risk => risk.description)
     }
   }
 
@@ -507,6 +662,13 @@ export abstract class BaseExecutor implements ICodeExecutor {
     return {
       codeType: 'unknown',
       confidence: 0.1,
+      technologies: ['CANVAS'],
+      complexity: 1,
+      estimatedRuntime: 1,
+      potentialIssues: ['Analysis failed'],
+      securityScore: 50,
+      performanceScore: 50,
+      recommendations: ['Manual review required'],
       detectedFeatures: [],
       dependencies: [],
       securityRisks: [],

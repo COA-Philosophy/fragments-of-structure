@@ -1,4 +1,4 @@
-// 🎨 Fragments of Structure - Executor Types v2.0
+// 🎨 Fragments of Structure - Enhanced Executor Types v2.0
 // 統一マルチメディア実行エンジンの型定義システム
 
 /**
@@ -7,10 +7,26 @@
  */
 export interface ExecutionResult {
   success: boolean
-  error?: string
+  error?: string | { 
+    message: string
+    type?: string
+    line?: number
+    column?: number
+    suggestion?: string
+    helpfulHint?: string
+  }
   warnings?: string[]
   executionTime?: number
+  memoryUsage?: number
+  performanceScore?: number
+  technologies?: TechnicalTag[]
+  output?: any
   metadata?: ExecutionMetadata
+  debugInfo?: {
+    originalError?: string
+    codePreview?: string
+    timestamp?: string
+  }
 }
 
 /**
@@ -38,6 +54,8 @@ export interface ExecutionMetadata {
  */
 export type CodeType = 
   | 'canvas'     // Canvas 2D API
+  | 'javascript' // Pure JavaScript
+  | 'html5'      // HTML5 APIs
   | 'three'      // Three.js 3D
   | 'webgl'      // WebGL/GLSL
   | 'svg'        // SVG + Animation
@@ -45,6 +63,34 @@ export type CodeType =
   | 'p5'         // p5.js
   | 'html'       // HTML + JavaScript
   | 'unknown'    // 未分類
+
+/**
+ * 技術タグ分類
+ * Fragment表示用の技術識別システム
+ */
+export type TechnicalTag = 
+  | 'CANVAS'
+  | 'ANIMATION' 
+  | 'INTERACTIVE'
+  | 'DRAWING'
+  | 'MATH'
+  | 'COLOR'
+  | 'THREE'
+  | 'SVG'
+  | 'CSS'
+  | 'P5.JS'
+  | 'L-SYSTEM'
+  | 'HTML5'
+
+/**
+ * エラー重要度分類
+ */
+export type ErrorSeverity = 'info' | 'warning' | 'error' | 'critical'
+
+/**
+ * パフォーマンスモード
+ */
+export type PerformanceMode = 'speed' | 'compatibility' | 'features'
 
 /**
  * 実行環境の設定オプション
@@ -58,8 +104,10 @@ export interface ExecutionOptions {
   
   // パフォーマンス制御
   maxExecutionTime?: number
+  timeoutMs?: number
   frameRateLimit?: number
   memoryLimit?: number
+  performanceMode?: PerformanceMode
   
   // セキュリティ設定
   sandboxLevel?: 'strict' | 'normal' | 'permissive'
@@ -68,6 +116,7 @@ export interface ExecutionOptions {
   
   // デバッグ・開発設定
   enableDebugMode?: boolean
+  enableDebugInfo?: boolean
   enablePerformanceMonitoring?: boolean
   enableErrorReporting?: boolean
   
@@ -85,11 +134,11 @@ export interface ExecutionContext {
   // 描画ターゲット
   canvas?: HTMLCanvasElement
   container?: HTMLElement
-  targetId: string
+  targetId?: string
   
   // 環境情報
-  isFullscreen: boolean
-  viewport: {
+  isFullscreen?: boolean
+  viewport?: {
     width: number
     height: number
   }
@@ -97,14 +146,27 @@ export interface ExecutionContext {
   // ライフサイクル管理
   cleanup?: () => void
   animationId?: number | null
-  timers: {
+  animationIds?: Set<number>
+  timers?: {
     timeouts: number[]
     intervals: number[]
   }
   
   // イベント管理
-  eventListeners: Map<string, EventListener[]>
-  keyboardShortcuts: Map<string, () => void>
+  eventListeners?: Map<string, EventListener[]>
+  keyboardShortcuts?: Map<string, () => void>
+  
+  // 実行制御
+  timeoutMs?: number
+  clearOnCleanup?: boolean
+  
+  // パフォーマンス・デバッグ設定
+  enablePerformanceTracking?: boolean
+  enableDebugLogging?: boolean
+  metadata?: {
+    createdAt: number
+    version: string
+  }
 }
 
 /**
@@ -113,12 +175,19 @@ export interface ExecutionContext {
  */
 export interface CodeAnalysis {
   codeType: CodeType
-  confidence: number // 0-1 の確信度
-  detectedFeatures: DetectedFeature[]
-  dependencies: string[]
-  securityRisks: SecurityRisk[]
-  estimatedComplexity: 'simple' | 'moderate' | 'complex' | 'advanced'
-  recommendedExecutor: string
+  confidence?: number // 0-1 の確信度
+  technologies: TechnicalTag[]
+  complexity: number
+  estimatedRuntime: number
+  potentialIssues: string[]
+  securityScore: number
+  performanceScore: number
+  recommendations: string[]
+  detectedFeatures?: DetectedFeature[]
+  dependencies?: string[]
+  securityRisks?: SecurityRisk[]
+  estimatedComplexity?: 'simple' | 'moderate' | 'complex' | 'advanced'
+  recommendedExecutor?: string
 }
 
 /**
@@ -149,7 +218,7 @@ export interface SecurityRisk {
 export interface ICodeExecutor {
   // エンジン情報
   readonly name: string
-  readonly version: string
+  readonly version?: string
   readonly supportedTypes: CodeType[]
   
   // 主要機能
@@ -161,11 +230,93 @@ export interface ICodeExecutor {
   ): Promise<ExecutionResult>
   
   // ライフサイクル管理
-  cleanup(context: ExecutionContext): Promise<void>
+  cleanup?(context: ExecutionContext): Promise<void>
   
   // 機能チェック
   supports(codeType: CodeType): boolean
   canExecute(code: string): Promise<boolean>
+  
+  // 健康チェック（オプション）
+  performHealthCheck?(): Promise<{
+    status: 'healthy' | 'warning' | 'critical'
+    metrics: any
+    recommendations: string[]
+  }>
+}
+
+/**
+ * エグゼキューター情報
+ */
+export interface ExecutorInfo {
+  name: string
+  version: string
+  description: string
+  supportedTypes: CodeType[]
+  capabilities: string[]
+  status: 'active' | 'inactive' | 'maintenance'
+  performanceRating: number
+  compatibilityScore: number
+  securityLevel: 'low' | 'medium' | 'high'
+}
+
+/**
+ * システムヘルスレポート
+ */
+export interface SystemHealthReport {
+  overall: 'healthy' | 'warning' | 'critical'
+  timestamp: string
+  executors: { [key: string]: ExecutorHealthStatus }
+  performance: {
+    averageExecutionTime: number
+    successRate: number
+    errorRate: number
+    totalExecutions: number
+  }
+  recommendations: string[]
+  systemInfo: {
+    factoryVersion: string
+    activeExecutors: number
+    supportedTypes: CodeType[]
+  }
+}
+
+/**
+ * エグゼキューターヘルス状態
+ */
+export interface ExecutorHealthStatus {
+  status: 'healthy' | 'warning' | 'critical'
+  performanceScore: number
+  errorRate: number
+  recommendations: string[]
+}
+
+/**
+ * パフォーマンス指標
+ */
+export interface PerformanceMetrics {
+  totalExecutions: number
+  averageTime: number
+  errorRate: number
+  successRate: number
+}
+
+/**
+ * 実行指標
+ */
+export interface ExecutionMetrics {
+  executionTime: number
+  memoryUsage: number
+  performanceScore: number
+}
+
+/**
+ * システム指標
+ */
+export interface SystemMetrics {
+  uptime: number
+  totalExecutions: number
+  activeExecutors: number
+  systemLoad: number
 }
 
 /**
@@ -215,8 +366,10 @@ export const DEFAULT_EXECUTION_OPTIONS: ExecutionOptions = {
   enableInteraction: true,
   enableAudio: false,
   maxExecutionTime: 30000, // 30秒
+  timeoutMs: 5000, // 5秒
   frameRateLimit: 60,
   memoryLimit: 50 * 1024 * 1024, // 50MB
+  performanceMode: 'speed',
   sandboxLevel: 'normal',
   allowedAPIs: [
     'canvas',
@@ -233,6 +386,7 @@ export const DEFAULT_EXECUTION_OPTIONS: ExecutionOptions = {
     'xhr'
   ],
   enableDebugMode: false,
+  enableDebugInfo: false,
   enablePerformanceMonitoring: true,
   enableErrorReporting: true,
   showLoadingIndicator: true,
