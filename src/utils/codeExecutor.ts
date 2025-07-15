@@ -328,75 +328,86 @@ export function executeCanvasCode(
       .replace(/canvas\.setAttribute\s*\(\s*['"](?:width|height)['"]\s*,\s*[^)]+\)\s*;?\s*/g, '')
     
     // 実行用の関数を作成（Phase A+: Enhanced Error Handling）
-    const wrappedCode = `
-      'use strict';
-      
-      // 環境変数を展開
-      const { 
-        canvas, ctx,
-        Math, Date, console, window, document,
-        requestAnimationFrame, cancelAnimationFrame,
-        setTimeout, clearTimeout, setInterval, clearInterval
-      } = this;
-      
-      // canvasのサイズを取得
-      const width = canvas.width;
-      const height = canvas.height;
-      
-      // よく使う変数を事前定義
-      let animationId = null;
-      let particles = [];
-      let time = 0;
-      let frame = 0;
-      
-      // Math関数のショートカット
-      const { PI, sin, cos, tan, sqrt, abs, min, max, floor, ceil, round, random, atan2, pow } = Math;
-      const TWO_PI = PI * 2;
-      
-      // 🆕 Phase A+: Enhanced Error Handling
-      try {
-        // ユーザーのコードを実行
-        ${processedCode}
-      } catch (error) {
-        console.info('[Fragments Canvas]', error.message);
-        
-        // 🎯 Beautiful Error Classification
-        const errorMessage = error.message?.toLowerCase() || '';
-        
-        // DOM API制限エラー（Phase A+で解決済み）
-        if (errorMessage.includes('addeventlistener') || 
-            errorMessage.includes('not a function')) {
-          console.info('[Fragments] Event system working correctly in sandbox');
-          // エラーを隠蔽し、実行を継続
-          return;
-        }
-        
-        // Canvas API エラー
-        if (errorMessage.includes('canvas') || 
-            errorMessage.includes('context') ||
-            errorMessage.includes('getcontext')) {
-          console.warn('[Fragments] Canvas API error:', error.message);
-          // Canvas関連エラーは表示
-          throw new Error('Canvas API error: ' + error.message);
-        }
-        
-        // 軽微なプロパティエラーは無視
-        if (errorMessage.includes('textcontent') || 
-            errorMessage.includes('innerhtml') ||
-            errorMessage.includes('cannot set property')) {
-          console.info('[Fragments] DOM property safely ignored in sandbox');
-          return;
-        }
-        
-        // その他の重要なエラーは表示
-        throw error;
-      }
-    `
-    
-    // 関数を作成して実行（Phase A+: Enhanced）
+   // 🚀 正しい修正版: processedCodeも引数として分離
     try {
-      const executeFunc = new Function(wrappedCode)
-      executeFunc.call(safeEnvironment)
+      const executeFunc = new Function(
+        // 引数定義（processedCodeも引数として追加）
+        'canvas', 'ctx', 'width', 'height',
+        'Math', 'Date', 'console', 'window', 'document',
+        'requestAnimationFrame', 'cancelAnimationFrame',
+        'setTimeout', 'clearTimeout', 'setInterval', 'clearInterval',
+        'PI', 'sin', 'cos', 'tan', 'sqrt', 'abs', 'min', 'max', 'floor', 'ceil', 'round', 'random', 'atan2', 'pow',
+        'userCode', // ← processedCodeを引数として渡す
+        // 関数本体（processedCodeは使わない）
+        `
+        'use strict';
+        
+        // よく使う変数を事前定義
+        let animationId = null;
+        let particles = [];
+        let time = 0;
+        let frame = 0;
+        const TWO_PI = PI * 2;
+        
+        try {
+          // ユーザーのコードを実行（引数として受け取ったuserCodeを使用）
+          eval(userCode);
+        } catch (error) {
+          console.info('[Fragments Canvas]', error.message);
+          
+          // Beautiful Error Classification
+          const errorMessage = error.message?.toLowerCase() || '';
+          
+          // DOM API制限エラー（Phase A+で解決済み）
+          if (errorMessage.includes('addeventlistener') || 
+              errorMessage.includes('not a function')) {
+            console.info('[Fragments] Event system working correctly in sandbox');
+            return;
+          }
+          
+          // Canvas API エラー
+          if (errorMessage.includes('canvas') || 
+              errorMessage.includes('context') ||
+              errorMessage.includes('getcontext')) {
+            console.warn('[Fragments] Canvas API error:', error.message);
+            throw new Error('Canvas API error: ' + error.message);
+          }
+          
+          // 軽微なプロパティエラーは無視
+          if (errorMessage.includes('textcontent') || 
+              errorMessage.includes('innerhtml') ||
+              errorMessage.includes('cannot set property')) {
+            console.info('[Fragments] DOM property safely ignored in sandbox');
+            return;
+          }
+          
+          // その他の重要なエラーは表示
+          throw error;
+        }
+        `
+      )
+      
+      // safeEnvironmentから値を抽出して引数として渡す（processedCodeも追加）
+      executeFunc(
+        safeEnvironment.canvas,
+        safeEnvironment.ctx, 
+        safeEnvironment.width,
+        safeEnvironment.height,
+        safeEnvironment.Math,
+        safeEnvironment.Date,
+        safeEnvironment.console,
+        safeEnvironment.window,
+        safeEnvironment.document,
+        safeEnvironment.requestAnimationFrame,
+        safeEnvironment.cancelAnimationFrame,
+        safeEnvironment.setTimeout,
+        safeEnvironment.clearTimeout,
+        safeEnvironment.setInterval,
+        safeEnvironment.clearInterval,
+        Math.PI, Math.sin, Math.cos, Math.tan, Math.sqrt, Math.abs,
+        Math.min, Math.max, Math.floor, Math.ceil, Math.round, Math.random, Math.atan2, Math.pow,
+        processedCode // ← 最後の引数としてprocessedCodeを渡す
+      )
       
       // 🆕 Phase A+: Enhanced Cleanup Function
       ;(targetCanvas as any).__cleanup = () => {
@@ -838,4 +849,222 @@ export function getSystemDebugInfo(): Record<string, any> {
       errorDisplay: '✅ Beautiful'
     }
   }
+}
+// 🔧 既存ファイルの末尾に追加するコード
+// Phase C-1: Three.js機能追加（既存機能100%保護）
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 🌌 THREE.JS EXTENSION - 既存コードに影響を与えない追加機能
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * 🌌 Three.js実行エンジン (Phase C-1新機能)
+ * 既存のexecuteCanvasCodeを拡張・補完する3D実行システム
+ */
+export async function executeThreeCode(
+  code: string,
+  canvas: HTMLCanvasElement,
+  timeoutMs: number = 30000
+): Promise<ExecutionResult> {
+  return new Promise((resolve) => {
+    const startTime = performance.now()
+    
+    try {
+      // 🔍 Three.js可用性チェック
+      if (typeof window !== 'undefined' && !(window as any).THREE) {
+        // Three.jsライブラリの動的読み込み
+        const script = document.createElement('script')
+        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js'
+        script.onload = () => executeThreeCodeInternal(code, canvas, timeoutMs, startTime, resolve)
+        script.onerror = () => {
+          resolve({
+            success: false,
+            error: 'Three.jsライブラリの読み込みに失敗しました'
+          })
+        }
+        document.head.appendChild(script)
+        return
+      }
+
+      // Three.jsが既に読み込まれている場合
+      executeThreeCodeInternal(code, canvas, timeoutMs, startTime, resolve)
+
+    } catch (error) {
+      resolve({
+        success: false,
+        error: error instanceof Error ? error.message : 'Three.js実行中にエラーが発生しました'
+      })
+    }
+  })
+}
+
+/**
+ * 🎭 Three.js内部実行ロジック
+ */
+function executeThreeCodeInternal(
+  code: string,
+  canvas: HTMLCanvasElement,
+  timeoutMs: number,
+  startTime: number,
+  resolve: (result: ExecutionResult) => void
+) {
+  try {
+    const THREE = (window as any).THREE
+
+    // 🛡️ WebGL対応チェック
+    if (!isWebGLSupported()) {
+      resolve({
+        success: false,
+        error: 'WebGLがサポートされていません'
+      })
+      return
+    }
+
+    // 🎯 Three.jsセキュアコンテキスト
+    const threeContext = {
+      THREE,
+      canvas,
+      scene: new THREE.Scene(),
+      camera: null,
+      renderer: new THREE.WebGLRenderer({ 
+        canvas,
+        antialias: true,
+        alpha: true,
+        preserveDrawingBuffer: false,
+        powerPreference: 'high-performance'
+      }),
+      Math,
+      performance,
+      requestAnimationFrame,
+      console: {
+        log: console.log,
+        warn: console.warn,
+        error: console.error
+      }
+    }
+
+    // ⏱️ 実行タイムアウト設定
+    const timeoutId = setTimeout(() => {
+      if (threeContext.renderer) {
+        threeContext.renderer.dispose()
+      }
+      resolve({
+        success: false,
+        error: 'Three.js実行がタイムアウトしました'
+      })
+    }, timeoutMs)
+
+    // 🚀 安全なThree.jsコード実行
+    const wrappedCode = `
+      (function() {
+        'use strict';
+        const THREE = arguments[0];
+        const canvas = arguments[1];
+        const scene = arguments[2];
+        const renderer = arguments[3];
+        ${code}
+      })
+    `
+
+    const executeFunction = eval(wrappedCode)
+    executeFunction(
+      THREE, 
+      canvas, 
+      threeContext.scene, 
+      threeContext.renderer
+    )
+
+    clearTimeout(timeoutId)
+
+    resolve({
+      success: true
+    })
+
+  } catch (error) {
+    resolve({
+      success: false,
+      error: error instanceof Error ? error.message : 'Three.js実行エラー'
+    })
+  }
+}
+
+/**
+ * 🔧 WebGL対応チェック
+ */
+function isWebGLSupported(): boolean {
+  try {
+    const canvas = document.createElement('canvas')
+    return !!(window.WebGLRenderingContext && 
+             (canvas.getContext('webgl') || canvas.getContext('experimental-webgl')))
+  } catch (e) {
+    return false
+  }
+}
+
+/**
+ * 🎯 統合実行エンジン (Phase C-1メイン関数)
+ * 既存のexecuteCanvasCodeとの併用・自動切り替え
+ */
+export async function executeCode(
+  code: string,
+  canvas: HTMLCanvasElement,
+  timeoutMs: number = 30000
+): Promise<ExecutionResult> {
+  // コードタイプ自動判定
+  const codeType = detectCodeTypeSimple(code)
+  
+  switch (codeType) {
+    case 'three':
+      return await executeThreeCode(code, canvas, timeoutMs)
+    case 'canvas':
+    default:
+      // 既存のexecuteCanvasCodeを呼び出し（100%互換性保証）
+      return executeCanvasCode(code, canvas, canvas.id || 'canvas')
+  }
+}
+
+/**
+ * 🔍 シンプルなコードタイプ判定（既存のanalyzeCodeTypeと競合回避）
+ */
+function detectCodeTypeSimple(code: string): 'canvas' | 'three' {
+  const codeUpper = code.toUpperCase()
+  
+  // Three.js判定
+  if (codeUpper.includes('THREE') || 
+      codeUpper.includes('WEBGLRENDERER') ||
+      codeUpper.includes('NEW THREE.') ||
+      codeUpper.includes('PERSPECTIVECAMERA')) {
+    return 'three'
+  }
+  
+  // デフォルトはcanvas（既存機能保護）
+  return 'canvas'
+}
+
+/**
+ * 🌌 Three.js技術検出（既存のdetectTechnologiesと分離）
+ */
+export function detectThreeJSTechnologies(code: string): string[] {
+  const codeUpper = code.toUpperCase()
+  const technologies: string[] = []
+
+  if (codeUpper.includes('THREE') || codeUpper.includes('NEW THREE')) {
+    technologies.push('THREE')
+  }
+
+  if (codeUpper.includes('WEBGL') || codeUpper.includes('WEBGLRENDERER')) {
+    technologies.push('WEBGL')
+  }
+
+  if (codeUpper.includes('SHADER') || codeUpper.includes('GLSL') || 
+      codeUpper.includes('VERTEX') || codeUpper.includes('FRAGMENT')) {
+    technologies.push('SHADERS')
+  }
+
+  if (codeUpper.includes('BOXGEOMETRY') || codeUpper.includes('SPHEREGEOMETRY') ||
+      codeUpper.includes('MESH') || codeUpper.includes('SCENE')) {
+    technologies.push('3D')
+  }
+
+  return technologies
 }
