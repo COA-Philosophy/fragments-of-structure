@@ -192,5 +192,3 @@ export const getCategoryInfo = (category?: PoeticCategory) => {
   if (!category) return CATEGORY_DATA.canvas
   return CATEGORY_DATA[category] || CATEGORY_DATA.canvas
 }
-// 🔧 ビルド対応のため FragmentSummary を明示的にエクスポート
-export type { FragmentSummary }
