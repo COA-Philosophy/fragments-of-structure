@@ -70,6 +70,19 @@ export interface FragmentWithStats extends Fragment {
   user_has_resonated?: boolean   // ユーザーの共鳴状態
 }
 
+// 🆕 ギャラリー表示用の軽量Fragment型
+export interface FragmentSummary {
+  id: string
+  display_number: number
+  title: string
+  thumbnail_url?: string
+  display_method?: string
+  art_type?: string
+  resonance_count: number
+  whisper_count: number
+  created_at: string
+}
+
 // 🆕 投稿フォーム用型
 export interface CreateFragmentRequest {
   // バイリンガルコンテンツ
@@ -179,3 +192,5 @@ export const getCategoryInfo = (category?: PoeticCategory) => {
   if (!category) return CATEGORY_DATA.canvas
   return CATEGORY_DATA[category] || CATEGORY_DATA.canvas
 }
+// 🔧 ビルド対応のため FragmentSummary を明示的にエクスポート
+export type { FragmentSummary }
