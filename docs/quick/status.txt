@@ -1,0 +1,4 @@
+P3.1✅技術タグUX改善完了
+P3.2✅アクティブフィルターバー完了
+P3.3🔄結果表示詳細化待機
+Cursor/DiscoveryBar.tsx/filter-ux-improvements
