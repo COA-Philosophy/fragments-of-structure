@@ -1,5 +1,5 @@
-// Enhanced Fragment Types v2.2.0 - バイリンガル対応
-// 現在の構造を尊重しつつ、詩的カテゴリとバイリンガル機能を追加
+// Enhanced Fragment Types v2.2.1 - サンプルデータ完全対応版
+// 既存構造を尊重しつつ、サンプルデータの全プロパティを型安全にサポート
 
 // 🆕 詩的カテゴリ型（要件定義書v2.2.0準拠）
 export type PoeticCategory = 
@@ -16,6 +16,35 @@ export type FragmentType = 'canvas' | 'three' | 'glsl' | 'svg' | 'css'
 // 🆕 言語型
 export type Language = 'en' | 'ja'
 
+// 🆕 表示方法型（サンプルデータ対応）
+export type DisplayMethod = 'react-canvas' | 'react-svg' | 'iframe' | 'component'
+
+// 🆕 アート種別型（サンプルデータ対応）
+export type ArtType = 
+  | 'particle-system' 
+  | 'css-animation' 
+  | 'svg-graphic' 
+  | 'mathematical' 
+  | 'minimal' 
+  | 'generative'
+
+// 🆕 セキュリティレベル型
+export type SecurityLevel = 0 | 1 | 2 | 3
+
+// 🆕 パラメータ設定型
+export interface ParamConfig {
+  type: 'number' | 'color' | 'string' | 'boolean'
+  label: string
+  default: any
+  min?: number
+  max?: number
+  step?: number
+}
+
+export interface ParamsConfig {
+  [key: string]: ParamConfig
+}
+
 // 🆕 バイリンガルコンテンツ
 export interface BilingualContent {
   title_primary: string          // メイン言語タイトル
@@ -31,9 +60,9 @@ export interface CreatorIdentity {
   creator_nickname?: string      // Fragment Weaver #A7B2
 }
 
-// 🔄 Fragment型（既存互換性維持 + バイリンガル拡張）
+// 🔄 Fragment型（完全型安全版 - サンプルデータ全プロパティ対応）
 export interface Fragment {
-  // 既存フィールド（変更なし）
+  // ====== 既存コアフィールド（変更なし） ======
   id: string
   display_number: number
   title: string                  // 既存互換性のため維持
@@ -46,38 +75,47 @@ export interface Fragment {
   is_published: boolean
   forked_from?: string
   has_params: boolean
-  params_config?: any
+  params_config?: ParamsConfig
   created_at: string
   updated_at: string
   
-  // 🆕 バイリンガルフィールド
+  // ====== サンプルデータ対応フィールド ======
+  display_method?: DisplayMethod  // 'react-canvas' | 'react-svg' など
+  security_level?: SecurityLevel  // 0, 1, 2, 3
+  art_type?: ArtType             // 'particle-system' | 'css-animation' など
+  fork_count?: number            // フォーク数
+  resonance_count?: number       // 共鳴数
+  whisper_count?: number         // ささやき数
+  view_count?: number            // 閲覧数
+  
+  // ====== バイリンガルフィールド（将来拡張用） ======
   title_primary?: string
   title_secondary?: string
   description_primary?: string
   description_secondary?: string
   primary_language?: Language
   
-  // 🆕 創作者・カテゴリフィールド
+  // ====== 創作者・カテゴリフィールド（将来拡張用） ======
   creator_hash?: string
   creator_nickname?: string
   category?: PoeticCategory
 }
 
-// 🆕 統計付きFragment
+// 🆕 統計付きFragment（後方互換性維持）
 export interface FragmentWithStats extends Fragment {
-  resonance_count: number
-  whisper_count: number
+  resonance_count: number        // 必須（Fragment型では任意）
+  whisper_count: number          // 必須（Fragment型では任意）
   user_has_resonated?: boolean   // ユーザーの共鳴状態
 }
 
-// 🆕 ギャラリー表示用の軽量Fragment型
+// 🔄 ギャラリー表示用の軽量Fragment型（サンプルデータ対応）
 export interface FragmentSummary {
   id: string
   display_number: number
   title: string
   thumbnail_url?: string
-  display_method?: string
-  art_type?: string
+  display_method?: DisplayMethod  // サンプルデータ対応
+  art_type?: ArtType             // サンプルデータ対応
   resonance_count: number
   whisper_count: number
   created_at: string

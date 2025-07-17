@@ -1,5 +1,6 @@
-// 🎨 Fragments of Structure - Enhanced Executor Types v2.0
+// 🎨 Fragments of Structure - Enhanced Executor Types v2.1
 // 統一マルチメディア実行エンジンの型定義システム
+// ✅ 3Dサポート追加 - ThreeExecutor対応
 
 /**
  * 実行結果の統一インターフェース
@@ -51,6 +52,7 @@ export interface ExecutionMetadata {
 /**
  * サポートされるコード技術タイプ
  * Phase 2で段階的に拡張予定
+ * ✅ 3D追加 - ThreeExecutor対応
  */
 export type CodeType = 
   | 'canvas'     // Canvas 2D API
@@ -58,6 +60,7 @@ export type CodeType =
   | 'html5'      // HTML5 APIs
   | 'three'      // Three.js 3D
   | 'webgl'      // WebGL/GLSL
+  | '3d'         // 3D Graphics (General)
   | 'svg'        // SVG + Animation
   | 'css'        // CSS Animation
   | 'p5'         // p5.js
@@ -67,6 +70,7 @@ export type CodeType =
 /**
  * 技術タグ分類
  * Fragment表示用の技術識別システム
+ * ✅ WEBGL追加 - ThreeExecutor対応
  */
 export type TechnicalTag = 
   | 'CANVAS'
@@ -76,6 +80,7 @@ export type TechnicalTag =
   | 'MATH'
   | 'COLOR'
   | 'THREE'
+  | 'WEBGL'      // ← 追加！ThreeExecutor対応
   | 'SVG'
   | 'CSS'
   | 'P5.JS'

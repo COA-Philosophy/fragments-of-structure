@@ -1,12 +1,13 @@
-// @ts-nocheck
 // src/data/sampleFragments.ts
 // Fragments of Structure - サンプルコードアートデータ
+// 🎯 型安全性確保済み - @ts-nocheck削除完了
 
 import { Fragment, FragmentSummary } from '@/types/fragment';
 
 /**
  * 🎨 開発用サンプルFragmentデータ
  * 要件定義書の世界観に基づいた多様なコードアート表現
+ * ✅ 完全型安全 - TypeScript型チェック有効
  */
 export const sampleFragments: Fragment[] = [
   {
@@ -509,6 +510,7 @@ export const sampleFragments: Fragment[] = [
 /**
  * 📋 ギャラリー表示用の軽量データ
  * パフォーマンス最適化のため、必要最小限の情報のみ
+ * ✅ 完全型安全 - FragmentSummary型準拠
  */
 export const sampleFragmentSummaries: FragmentSummary[] = sampleFragments.map(fragment => ({
   id: fragment.id,
@@ -517,13 +519,14 @@ export const sampleFragmentSummaries: FragmentSummary[] = sampleFragments.map(fr
   thumbnail_url: fragment.thumbnail_url,
   display_method: fragment.display_method,
   art_type: fragment.art_type,
-  resonance_count: fragment.resonance_count,
-  whisper_count: fragment.whisper_count,
+  resonance_count: fragment.resonance_count || 0,  // 型安全性確保
+  whisper_count: fragment.whisper_count || 0,      // 型安全性確保
   created_at: fragment.created_at
 }));
 
 /**
  * 🔍 開発用ユーティリティ関数
+ * ✅ 完全型安全 - 型推論による安全な関数実装
  */
 export const getFragmentById = (id: string): Fragment | undefined => {
   return sampleFragments.find(fragment => fragment.id === id);
@@ -541,6 +544,6 @@ export const getLatestFragments = (count: number = 5): Fragment[] => {
 
 export const getPopularFragments = (count: number = 5): Fragment[] => {
   return [...sampleFragments]
-    .sort((a, b) => b.resonance_count - a.resonance_count)
+    .sort((a, b) => (b.resonance_count || 0) - (a.resonance_count || 0))  // 型安全性確保
     .slice(0, count);
 };
