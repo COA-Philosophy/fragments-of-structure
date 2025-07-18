@@ -504,16 +504,26 @@ export default function GalleryView() {
             </div>
             <p className="text-[#6a6a6a] text-sm font-light mb-2">
               {searchQuery || selectedTechnologies.length > 0 
-                ? '条件に一致する構造が見つかりませんでした'
-                : 'まだ構造のかけらはありません'
+                ? 'No fragments match your current filters'
+                : 'No fragments have been created yet'
               }
             </p>
-            <p className="text-xs text-[#6a6a6a]/60">
-              {searchQuery || selectedTechnologies.length > 0 
-                ? '検索条件を変更してみてください'
-                : '最初の Fragment を投稿してみましょう'
-              }
-            </p>
+            <div className="text-xs text-[#6a6a6a]/60 space-y-1">
+              {(searchQuery || selectedTechnologies.length > 0) ? (
+                <div className="space-y-1">
+                  <p>Current filters:</p>
+                  {searchQuery && (
+                    <p className="font-mono">Search: "{searchQuery}"</p>
+                  )}
+                  {selectedTechnologies.length > 0 && (
+                    <p className="font-mono">Technologies: {selectedTechnologies.join(' AND ')}</p>
+                  )}
+                  <p className="mt-2 text-[#6a6a6a]/80">Try adjusting your search terms or technology filters</p>
+                </div>
+              ) : (
+                <p>Create the first fragment to get started</p>
+              )}
+            </div>
           </div>
         )}
       </div>

@@ -94,10 +94,11 @@ export default function DiscoveryBar({
           {/* デスクトップ版コントロール */}
           <div className="hidden md:flex items-center space-x-4 ml-6">
             {/* ソートドロップダウン */}
-            <div className="relative">
+            <div className="relative" style={{ position: 'relative', zIndex: 50 }}>
               <button
                 onClick={() => setIsSortDropdownOpen(!isSortDropdownOpen)}
                 className="flex items-center space-x-2 px-4 py-2 text-sm font-medium text-gray-700 bg-gray-50 border border-gray-200 rounded-lg hover:bg-gray-100 transition-colors duration-150"
+                style={{ position: 'relative', zIndex: 50 }}
               >
                 <span>新着順</span>
                 <ChevronDown className={`h-4 w-4 transition-transform duration-150 ${isSortDropdownOpen ? 'rotate-180' : ''}`} />
@@ -110,7 +111,8 @@ export default function DiscoveryBar({
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, y: -8 }}
                     transition={{ duration: 0.15 }}
-                    className="absolute right-0 top-full mt-2 w-48 bg-white border border-gray-200 rounded-xl shadow-lg z-50"
+                    className="absolute right-0 top-full mt-2 w-48 bg-white border border-gray-200 rounded-xl shadow-lg"
+                    style={{ zIndex: 9999 }}
                   >
                     <div className="py-2">
                       {SORT_OPTIONS.map((option) => (
@@ -383,40 +385,58 @@ export default function DiscoveryBar({
         {/* 結果表示 */}
         <div className="pb-4">
           <div className="flex items-center justify-between text-sm">
-            <span className="text-gray-600">
-              {isFiltered ? (
-                <>
-                  <span className="font-medium text-gray-900">{resultCount}</span>
-                  <span className="text-gray-500">/{totalCount}</span>
-                  <span className="ml-1">の構造が見つかりました</span>
-                </>
-              ) : (
-                <>
-                  <span className="font-medium text-gray-900">{totalCount}</span>
-                  <span className="ml-1">の構造が見つかりました</span>
-                </>
-              )}
-            </span>
-
-            {/* アクティブフィルター表示（モバイル） */}
-            {hasActiveFilters && (
-              <div className="md:hidden flex items-center space-x-2">
-                <span className="text-xs text-gray-500">フィルター:</span>
-                <div className="flex flex-wrap gap-1">
-                  {selectedTechnologies.slice(0, 2).map((tech) => (
-                    <span
-                      key={tech}
-                      className="inline-flex items-center px-2 py-0.5 text-xs bg-slate-100 text-slate-600 rounded"
-                    >
-                      {TECH_DISPLAY_NAMES[tech] || tech}
-                    </span>
-                  ))}
-                  {selectedTechnologies.length > 2 && (
-                    <span className="text-xs text-gray-500">
-                      +{selectedTechnologies.length - 2}
-                    </span>
+            <div className="flex flex-col space-y-1">
+              <span className="text-gray-600">
+                {isFiltered ? (
+                  <>
+                    <span className="font-medium text-gray-900">{resultCount}</span>
+                    <span className="text-gray-500">/{totalCount}</span>
+                    <span className="ml-1">fragments found</span>
+                  </>
+                ) : (
+                  <>
+                    <span className="font-medium text-gray-900">{totalCount}</span>
+                    <span className="ml-1">fragments available</span>
+                  </>
+                )}
+              </span>
+              {isFiltered && (
+                <div className="text-xs text-gray-500">
+                  {searchQuery.trim() && (
+                    <span>Search: "{searchQuery}" </span>
+                  )}
+                  {selectedTechnologies.length > 0 && (
+                    <span>Tech: {selectedTechnologies.join(' + ')}</span>
                   )}
                 </div>
+              )}
+            </div>
+            {/* モバイル版アクティブフィルター表示 */}
+            {hasActiveFilters && (
+              <div className="md:hidden flex flex-col space-y-1">
+                <div className="flex items-center space-x-2">
+                  <span className="text-xs text-gray-500">Active:</span>
+                  <div className="flex flex-wrap gap-1">
+                    {selectedTechnologies.slice(0, 2).map((tech) => (
+                      <span
+                        key={tech}
+                        className="inline-flex items-center px-2 py-0.5 text-xs bg-slate-100 text-slate-600 rounded"
+                      >
+                        {TECH_DISPLAY_NAMES[tech] || tech}
+                      </span>
+                    ))}
+                    {selectedTechnologies.length > 2 && (
+                      <span className="text-xs text-gray-500">
+                        +{selectedTechnologies.length - 2} more
+                      </span>
+                    )}
+                  </div>
+                </div>
+                {searchQuery.trim() && (
+                  <div className="text-xs text-gray-500">
+                    Search: "<span className="font-mono">{searchQuery}</span>"
+                  </div>
+                )}
               </div>
             )}
           </div>

@@ -1,4 +1,5 @@
 P3.1✅技術タグUX改善完了
 P3.2✅アクティブフィルターバー完了
-P3.3🔄結果表示詳細化待機
-Cursor/DiscoveryBar.tsx/filter-ux-improvements
+P3.3✅結果表示詳細化完了（空状態英語化）
+軽微問題: ソートドロップダウン表示（機能正常）
+Cursor/DiscoveryBar.tsx+GalleryView.tsx/filter-ux-improvements

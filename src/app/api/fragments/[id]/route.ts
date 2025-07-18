@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { supabase } from '@/lib/supabase'
-import crypto from 'crypto'
+import bcrypt from 'bcryptjs'
 
 export async function POST(
   request: NextRequest,
@@ -33,20 +33,13 @@ export async function POST(
       )
     }
 
-    // パスワードをハッシュ化して比較
-    // 123をtest123のハッシュとして使用
-    const passwordHash = password === '123' 
-      ? 'a665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3'
-      : crypto
-          .createHash('sha256')
-          .update(password)
-          .digest('hex')
-
+    // bcryptでパスワード照合
     console.log('入力されたパスワード:', password)
-    console.log('生成されたハッシュ:', passwordHash)
     console.log('DBのハッシュ:', fragment.password_hash)
 
-    if (fragment.password_hash !== passwordHash) {
+    const isPasswordValid = await bcrypt.compare(password, fragment.password_hash)
+
+    if (!isPasswordValid) {
       return NextResponse.json(
         { error: 'パスワードが正しくありません' },
         { status: 401 }
@@ -70,4 +63,4 @@ export async function POST(
       { status: 500 }
     )
   }
-}
+} 
